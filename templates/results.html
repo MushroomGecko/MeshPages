@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Mesh Search - Results</title>
+        <link rel="stylesheet" href="/static/css/style.css">
+    </head>
+    <body>
+
+        <div class="search-container">
+            <form method="post" action="/search" style="display: contents;">
+                <input type="text" name="query" placeholder="Enter path or search..." required value="{{ query }}">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+
+        <div id="search-results">
+            {{ content | safe }}
+        </div>
+
+    </body>
+</html>
