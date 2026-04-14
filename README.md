@@ -21,6 +21,8 @@ MeshPages enables web-based communication over Meshtastic mesh networks. It allo
 
 ### Installation
 
+#### Option 1: Development Installation (Recommended for Development)
+
 1. Clone this repository:
 
 ```bash
@@ -40,10 +42,40 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-1. Install dependencies:
+1. Install dependencies and MeshPages in editable mode:
 
 ```bash
+pip install -e .
 pip install -r requirements.txt
+```
+
+This allows you to import `meshpages` directly while developing and see changes immediately.
+
+#### Option 2: Production Installation (Standard Package Install)
+
+1. Clone this repository:
+
+```bash
+git clone https://github.com/MushroomGecko/MeshPages.git
+cd MeshPages
+```
+
+1. Create a virtual environment:
+
+```bash
+python3 -m venv .venv
+```
+
+1. Activate the virtual environment:
+
+```bash
+source .venv/bin/activate
+```
+
+1. Install the package:
+
+```bash
+pip install .
 ```
 
 ### Finding Your Radios

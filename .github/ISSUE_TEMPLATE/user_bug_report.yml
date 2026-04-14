@@ -1,0 +1,94 @@
+name: User Bug Report
+description: Create a bug report to help us improve MeshPages
+title: "[BUG] Brief description of the issue"
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Thank you for helping us improve MeshPages! Please fill out the form below to help us understand and fix the issue."
+
+  - type: textarea
+    id: what_went_wrong
+    attributes:
+      label: What went wrong?
+      description: Describe the bug in simple terms. What did you expect to happen, and what happened instead?
+      placeholder: "Example: When I try to request a page from a mesh node, I get a timeout error."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce_steps
+    attributes:
+      label: How can we reproduce this?
+      description: Help us recreate the problem by listing the exact steps. Be as specific as possible. The more details, the better. You can never give too many details!
+      placeholder: |
+        1. Started the client with `python client.py --usb-interface /dev/ttyUSB0`
+        2. Opened the web interface at http://127.0.0.1:8000
+        3. Entered the mesh URI `mesh://!9e9d7a6c/home`
+        4. The request timed out after 60 seconds instead of returning the page
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: What should have happened?
+      description: Describe what you expected to see or happen.
+      placeholder: "Example: I expected to receive the page from the remote node and see it rendered in my browser."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: operating_system
+    attributes:
+      label: Operating System
+      options:
+        - label: Windows 11
+        - label: macOS
+        - label: Ubuntu/Linux
+        - label: Raspberry Pi OS
+        - label: Other (Describe in 'Additional Context')
+
+  - type: checkboxes
+    id: meshpages_component
+    attributes:
+      label: Which component are you using?
+      options:
+        - label: MeshPages Web Client
+        - label: MeshPages Web Server
+        - label: Custom MeshPages Server
+        - label: Not sure
+
+  - type: textarea
+    id: meshtastic_info
+    attributes:
+      label: Meshtastic Setup
+      description: "Provide information about your Meshtastic radios and configuration"
+      placeholder: |
+        Radio 1: Heltec V3 (node !9e9d7a6c)
+        Radio 2: RAK Wireless (node !5f2e1a3b)
+        Firmware version: 2.7.15
+        LoRa settings: LONG_FAST preset
+
+  - type: textarea
+    id: error_messages
+    attributes:
+      label: Error messages or logs
+      description: |
+        If you have:
+        - **An error message** - copy and paste it exactly as you see it
+        - **Server/Client logs** - paste the relevant output (first 50 lines)
+        - **Screenshots** - helpful for UI issues
+      placeholder: "Paste error messages or logs here"
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Anything else?
+      description: Add any other details that might be helpful
+      placeholder: |
+        - When did this start happening?
+        - Does it happen every time or just sometimes?
+        - How many nodes are in your mesh network?
+        - Are you experiencing packet loss or high channel utilization?
+        - Did this work with a previous version of MeshPages?
