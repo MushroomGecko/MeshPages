@@ -141,10 +141,27 @@ def search(request: Request, query: str = Form(...)) -> dict:
     )
 
 
+@app.get("/")
+def index(request: Request):
+    """
+    Serve the home page.
+
+    Renders the index.html template when accessing the root path.
+
+    Parameters:
+        request (Request): The HTTP request object provided by FastAPI.
+
+    Returns:
+        TemplateResponse: The rendered index.html template.
+    """
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+    )
+
+
 # Mount static file directories for CSS, JavaScript, and other assets
 app.mount("/static", StaticFiles(directory="static"), name="static")
-# Mount templates directory at root path
-app.mount("/", StaticFiles(directory="templates"), name="templates")
 
 
 def main():
