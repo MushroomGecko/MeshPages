@@ -1,0 +1,92 @@
+name: Feature Request
+description: Suggest an idea to make MeshPages better
+title: "[FEAT] Brief description of your idea"
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: "Thank you for suggesting a feature! We'd love to hear how we can make MeshPages better for you. Please fill out the form below."
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Tell us about the situation where you wish MeshPages had a certain feature. What makes it difficult or frustrating right now?
+      placeholder: "Example: When I'm trying to serve web pages to multiple mesh nodes, I can't easily manage different response formats or priority levels for different types of requests."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to see?
+      description: Describe the feature you'd like to see added to MeshPages. Be as specific as you can!
+      placeholder: "Example: I'd like to add middleware support to process requests before they reach handlers, or a caching layer to serve frequently-requested pages faster without recompression."
+    validations:
+      required: true
+
+  - type: textarea
+    id: why_important
+    attributes:
+      label: Why is this important to you?
+      description: Help us understand how this feature would improve your MeshPages experience and mesh network.
+      placeholder: "Example: This would significantly reduce mesh network congestion and allow me to serve more complex pages efficiently even with limited bandwidth on LoRa channels."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: use_case
+    attributes:
+      label: What are you using MeshPages for?
+      description: This helps us understand the context of your feature request
+      options:
+        - label: Web Client (browsing mesh pages)
+        - label: Custom Server (serving pages)
+        - label: Both client and server
+        - label: Experimental/Research
+        - label: Other (describe in 'Additional Context')
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Other ideas you considered
+      description: Did you think of other ways to solve this problem? What are they?
+      placeholder: "Example: I considered just increasing the courtesy_interval, but that would slow down all responses. A prioritization system would be better because different requests have different urgency."
+
+  - type: textarea
+    id: technical_details
+    attributes:
+      label: Technical details
+      description: |
+        If this is a technical feature, provide relevant details:
+        - Does it require changes to the packet format?
+        - Would it affect performance?
+        - Are there compatibility concerns with existing mesh nodes?
+      placeholder: |
+        - My use case involves: [brief description]
+        - Estimated impact on channel utilization: [minimal/moderate/significant]
+        - Backwards compatibility needed: [yes/no]
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots, examples, or mockups
+      description: |
+        Do you have any:
+        - **Sketches or mockups** of what you imagine? - Please add them!
+        - **Examples from other systems** that do something similar? - Screenshots or descriptions help!
+        - **Use case diagrams** or architecture sketches? - Helpful for complex features!
+
+        Just paste or drag them below. Visual examples are super helpful!
+      placeholder: "Paste or drag screenshots and mockups here"
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Anything else?
+      description: Any other context that would help us understand your feature request
+      placeholder: |
+        - How often would you use this feature?
+        - How many mesh nodes are in your network?
+        - Would this help other users too, or is it just for your use case?
+        - Are there specific LoRa settings or mesh configurations where this would be most useful?

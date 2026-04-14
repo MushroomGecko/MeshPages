@@ -1,0 +1,123 @@
+name: Setup/Configuration Bug Report
+description: Report issues with setting up or configuring MeshPages (radio drivers, permissions, dependencies, etc.)
+title: "[SETUP] Brief description of the issue"
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Thank you for reporting a setup/configuration issue! This helps us improve the installation experience. Please provide as much detail as possible."
+
+  - type: checkboxes
+    id: component
+    attributes:
+      label: What component is failing?
+      description: Which part of the MeshPages setup is having issues?
+      options:
+        - label: Radio detection/USB connection
+        - label: Meshtastic library installation
+        - label: Python dependencies
+        - label: MeshPages Web Client startup
+        - label: Custom MeshPages Server startup
+        - label: Radio firmware/driver issues
+        - label: Permissions (USB device access)
+        - label: Network/connectivity
+        - label: Other (Describe in 'What's Happening?')
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What's happening?
+      description: Describe the error or unexpected behavior you're encountering.
+      placeholder: "Example: When I run `python find_radios.py`, no devices are detected even though my Heltec V3 is connected via USB."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce_steps
+    attributes:
+      label: Steps to reproduce
+      description: What did you do when the problem occurred? Be specific about your setup.
+      placeholder: |
+        1. Connected Heltec V3 radio via USB
+        2. Ran `python find_radios.py`
+        3. Saw "No Meshtastic devices found"
+        4. Tried with `--usb-interface /dev/ttyUSB0` but got PermissionError
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_logs
+    attributes:
+      label: Error messages and logs
+      description: |
+        Please provide the exact error messages and relevant logs.
+        - For Python errors: paste the full traceback
+        - For USB/driver issues: provide `lsusb` or device manager output
+        - For permission errors: include the full permission error message
+      placeholder: "Paste your error messages and logs here"
+    validations:
+      required: true
+
+  - type: textarea
+    id: os_info
+    attributes:
+      label: Operating System
+      description: "Provide the operating system and version you are using. Run `uname -a` on Linux and paste the output."
+      placeholder: "Windows 11 24H2, macOS 14.2, Ubuntu 24.04, Arch Linux 6.19.10-arch1-1, Raspberry Pi OS (Bullseye), etc."
+
+  - type: textarea
+    id: python_version
+    attributes:
+      label: Python version
+      description: "Provide the version of Python you are using. Run: `python --version` and paste the output below."
+      placeholder: "Paste your Python version here"
+    validations:
+      required: true
+
+  - type: textarea
+    id: radio_info
+    attributes:
+      label: Radio Hardware
+      description: "Provide information about your Meshtastic radio(s)"
+      placeholder: |
+        Radio model: Heltec V3
+        Meshtastic firmware version: 2.7.15
+        Connected via: USB (micro-USB cable)
+        Node ID: !9e9d7a6c
+
+  - type: textarea
+    id: usb_info
+    attributes:
+      label: USB Connection Info
+      description: "Run `lsusb` (Linux/macOS) or check Device Manager (Windows) and paste USB device info"
+      placeholder: |
+        Bus 001 Device 003: ID 1234:5678 Heltec Meshtastic Device
+        Or paste the device name and COM port from Windows Device Manager
+
+  - type: checkboxes
+    id: troubleshooting
+    attributes:
+      label: What you've already tried
+      description: Have you attempted any troubleshooting? (Check all that apply)
+      options:
+        - label: "Reinstalled Meshtastic library: `pip install --upgrade meshtastic`"
+        - label: "Installed from requirements.txt: `pip install -r requirements.txt`"
+        - label: "Tried different USB cables and ports"
+        - label: "Restarted the radio device"
+        - label: "Updated radio firmware to latest version"
+        - label: "Used `sudo` to bypass permission errors"
+        - label: "Checked that USB drivers are installed (Windows)"
+        - label: "Ran find_radios.py with --verbose flag"
+        - label: "Other: (describe in 'Additional Context')"
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Any other information that might help us debug
+      placeholder: |
+        - Is this a fresh installation or an upgrade?
+        - Are you on Linux and need to add udev rules for USB access?
+        - Are you using a hub or extension cable?
+        - Have you successfully used MeshPages with this radio before?
+        - What exact command fails when you try to reproduce?
