@@ -92,7 +92,7 @@ pip install .
 Before connecting to your Meshtastic radio, you can discover available USB devices:
 
 ```bash
-./.venv/bin/python find_radios.py
+./.venv/bin/python helper_utilities/find_radios.py
 ```
 
 This will list all connected Meshtastic radios and their device paths (e.g., `/dev/ttyUSB0`).
@@ -314,7 +314,7 @@ app = MeshPageServer(
 Discover all connected Meshtastic radios on your system:
 
 ```bash
-./.venv/bin/python find_radios.py
+./.venv/bin/python helper_utilities/find_radios.py
 ```
 
 Output:
@@ -326,6 +326,31 @@ Found Meshtastic devices on:
 ```
 
 Use this to identify device paths for the `--usb-interface` parameter.
+
+### list_node_db.py
+
+List all nodes currently stored in the Meshtastic mesh network database:
+
+```bash
+sudo ./.venv/bin/python helper_utilities/list_node_db.py
+```
+
+Or specify a USB interface explicitly:
+
+```bash
+sudo ./.venv/bin/python helper_utilities/list_node_db.py --usb-interface /dev/ttyUSB0
+```
+
+Output:
+
+```
+Nodes in the node database:
+- !1234abcd: Alice Device (ALI) <-- You
+- !5678efgh: Bob Device (BOB)
+- !9abcdefg: Charlie Device (CHR)
+```
+
+This utility helps you identify all node IDs in your mesh network, including your own node, making it easy to connect to and interface with MeshPages servers.
 
 ## Troubleshooting
 

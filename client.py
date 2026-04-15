@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
     global meshpage
 
     # Use usb_interface from module-level args (parsed at module load time)
-    usb_interface = args.usb_interface
+    usb_interface = None if not args.usb_interface else args.usb_interface
 
     # Log connection attempt with appropriate message
     if usb_interface:

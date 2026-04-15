@@ -6,7 +6,7 @@ import meshtastic.serial_interface
 from pubsub import pub
 
 from meshpages.models import ResponsePacket
-from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet
+from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet, get_node_db_info
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -281,11 +281,27 @@ class MeshPageClient:
             str: The HTML/text response from the remote node, or an HTML-formatted error message
                  if validation, timeout, or processing fails.
         """
-        # Ensure target node ID has the required "!" prefix for Meshtastic addressing
+        # Normalize node ID to include Meshtastic's required "!" prefix for addressing
         node_id = target_node if target_node.startswith("!") else f"!{target_node}"
-        # Verify the target node is valid and reachable before sending request
+
+        # Validate target node exists and is reachable in the mesh network
         if not self._validate_target_node(node_id):
-            return f"<div style='color: orange;'>Invalid target node: {node_id}</div>"
+            # Target node not found; check for special case of self-request
+            if node_id == self.node_id:
+                return "<div style='color: orange;'>You cannot request a page from yourself.</div>"
+
+            # Build user-friendly error message with available nodes for reference
+            available_nodes = get_node_db_info(self.interface)
+            html_return_string = f"<div style='color: orange;'>Invalid target node: {node_id}. Available nodes:<ul>"
+
+            # Format each available node with identification and local node indicator
+            for node in available_nodes:
+                local_indicator = "<span style='color: green;'><-- You</span>" if available_nodes[node]["isMyNode"] else ""
+                html_return_string += f"<li>{node}: {available_nodes[node]['longName']} ({available_nodes[node]['shortName']}) {local_indicator}</li>"
+
+            html_return_string += "</ul></div>"
+            logger.error(f"Available nodes: {available_nodes}")
+            return html_return_string
 
         # Initialize state for this request: clear previous response data and set new target
         self.target_node = node_id
