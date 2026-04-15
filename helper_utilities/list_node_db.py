@@ -7,10 +7,12 @@ identification information including long names, short names, and highlights
 the local node.
 """
 
+import argparse
+
 import meshtastic
 import meshtastic.serial_interface
+
 from meshpages.utils import get_node_db_info
-import argparse
 
 # Create CLI argument parser for specifying USB interface
 parser = argparse.ArgumentParser(description="List nodes in the Meshtastic mesh network database")

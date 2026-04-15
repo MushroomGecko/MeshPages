@@ -1,14 +1,14 @@
 import logging
 import math
 import time
+import threading
 from queue import Queue
 from typing import Callable, Iterator, Union
-import threading
 
-import minify_html_onepass
 import meshtastic
 import meshtastic.serial_interface
 import meshtastic.version
+import minify_html_onepass
 from pubsub import pub
 
 from meshpages.air_traffic_control import AirTrafficControl
