@@ -296,7 +296,7 @@ class MeshPageClient:
 
             # Format each available node with identification and local node indicator
             for node in available_nodes:
-                local_indicator = "<span style='color: green;'>-- You</span>" if available_nodes[node]["isMyNode"] else ""
+                local_indicator = "<span style='color: green;'><-- You</span>" if available_nodes[node]["isMyNode"] else ""
                 html_return_string += f"<li>{node}: {available_nodes[node]['longName']} ({available_nodes[node]['shortName']}) {local_indicator}</li>"
 
             html_return_string += "</ul></div>"
