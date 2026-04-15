@@ -1,6 +1,8 @@
 import logging
 
 import brotli
+import meshtastic
+import meshtastic.serial_interface
 
 from meshpages.models import ResponsePacket
 
@@ -165,3 +167,40 @@ def decode_packet(payload: bytes) -> ResponsePacket:
         # Log decoding errors with details for debugging packet format issues
         logger.error(f"Error decoding packet: {e}")
         return None
+
+
+def get_node_db_info(interface: meshtastic.serial_interface.SerialInterface) -> dict:
+    """
+    Extract and format node information from the mesh network database.
+
+    Queries the connected radio device for all nodes in its node database and
+    extracts human-readable identification information. Includes identification
+    of the local node for easier reference in display contexts.
+
+    Parameters:
+        interface (meshtastic.serial_interface.SerialInterface): Connected interface to the Meshtastic radio.
+
+    Returns:
+        dict: Dictionary keyed by node ID (int), each value contains:
+            - longName (str): Full name of the node
+            - shortName (str): Short identifier for the node
+            - isMyNode (bool): True if this is the local radio node
+    """
+    # Retrieve the local node's information to identify which node is "mine"
+    my_node_info = interface.getMyNodeInfo()
+    my_node_id = my_node_info.get("user", {}).get("id", "")
+
+    # Get all nodes currently stored in the device's node database
+    all_nodes = interface.nodes
+    node_db_info = {}
+
+    # Extract relevant user information for each node
+    for node in all_nodes:
+        node_user = all_nodes[node].get("user", {})
+        node_db_info[node] = {
+            "longName": node_user.get("longName", ""),
+            "shortName": node_user.get("shortName", ""),
+            "isMyNode": True if my_node_id == node else False,
+        }
+
+    return node_db_info
