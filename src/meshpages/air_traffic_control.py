@@ -1,4 +1,3 @@
-import logging
 import time
 from math import pow
 from queue import Queue
@@ -6,8 +5,6 @@ from typing import Union
 
 from meshpages.channel_presets import ChannelPresets
 from meshpages.models import Config, PacketHistory
-
-logger = logging.getLogger(__name__)
 
 
 class AirTrafficControl:
@@ -87,8 +84,6 @@ class AirTrafficControl:
             float: Delay applied in seconds (0.0 if no delay was necessary).
         """
         current_utilization = self._get_current_utilization()
-        logger.debug(f"Current utilization: {current_utilization}")
-        logger.debug(f"Target utilization: {self.target_utilization}")
         if current_utilization < self.target_utilization:
             return 0.0
 
@@ -97,7 +92,6 @@ class AirTrafficControl:
         required_window_ms = total_airtime_ms / self.target_utilization
 
         delay_seconds = (required_window_ms / 1000) - self.window_seconds
-        logger.debug(f"Delay seconds: {delay_seconds}")
         if delay_seconds > 0.0:
             time.sleep(delay_seconds)
         return delay_seconds
