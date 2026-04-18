@@ -402,18 +402,27 @@ sudo ./.venv/bin/python examples/simple_responses/server.py --usb-interface /dev
 
 MeshPages includes comprehensive logging at multiple levels. By default, only INFO level and above are displayed. To see detailed DEBUG logs for troubleshooting:
 
-#### Using Environment Variables
+#### Using Environment Variables (Recommended)
 
-Set the `PYTHONLOGLEVEL` environment variable before running:
+Set the `PYTHONLOGLEVEL` environment variable before running. Place it after `sudo` so it gets passed to the Python process:
 
 **Client with Debug Logging:**
 ```bash
-PYTHONLOGLEVEL=DEBUG sudo ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
+sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
 ```
 
 **Server with Debug Logging:**
 ```bash
-PYTHONLOGLEVEL=DEBUG sudo ./.venv/bin/python examples/simple_responses/server.py --usb-interface /dev/ttyUSB0
+sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python examples/simple_responses/server.py --usb-interface /dev/ttyUSB0
+```
+
+**Try other log levels:**
+```bash
+# View only warnings and errors
+sudo PYTHONLOGLEVEL=WARNING ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
+
+# View all messages including debug
+sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
 ```
 
 ### Log Levels Explained

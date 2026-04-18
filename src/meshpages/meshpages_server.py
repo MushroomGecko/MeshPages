@@ -1,5 +1,6 @@
 import logging
 import math
+import os
 import time
 import threading
 from queue import Queue
@@ -22,7 +23,9 @@ if not logger.handlers:
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+    # Allow environment variable to override log level (default: INFO)
+    log_level = os.environ.get("PYTHONLOGLEVEL", "INFO").upper()
+    logger.setLevel(getattr(logging, log_level))
 
 # Buffer offset for the packet header
 BUFFER_OFFSET = 7
@@ -692,7 +695,7 @@ class MeshPageServer:
             logger.info(f"Is Favorite: {self.node_info.get('isFavorite', False)}")
 
             logger.info(f"Server started with {len(self.routes)} routes registered")
-            logger.info("Starting main server loop...")
+            logger.info("Server ready and listening for requests")
 
             # Main server loop: continuously process incoming requests and outgoing responses
             while True:

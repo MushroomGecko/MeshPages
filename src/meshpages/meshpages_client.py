@@ -1,4 +1,5 @@
 import logging
+import os
 import threading
 
 import meshtastic
@@ -14,7 +15,9 @@ if not logger.handlers:
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+    # Allow environment variable to override log level (default: INFO)
+    log_level = os.environ.get("PYTHONLOGLEVEL", "INFO").upper()
+    logger.setLevel(getattr(logging, log_level))
 
 # Meshtastic portnum for binary data transmission (used for encoded packets)
 PRIVATE_APP = "PRIVATE_APP"
