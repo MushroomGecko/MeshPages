@@ -398,6 +398,70 @@ sudo ./.venv/bin/python examples/simple_responses/server.py --usb-interface /dev
 
 ## Development
 
+### Enabling Debug Logging
+
+MeshPages includes comprehensive logging at multiple levels. By default, only INFO level and above are displayed. To see detailed DEBUG logs for troubleshooting:
+
+#### Using Environment Variables (Recommended)
+
+Set the `PYTHONLOGLEVEL` environment variable before running. Place it after `sudo` so it gets passed to the Python process:
+
+**Client with Debug Logging:**
+```bash
+sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
+```
+
+**Server with Debug Logging:**
+```bash
+sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python examples/simple_responses/server.py --usb-interface /dev/ttyUSB0
+```
+
+**Try other log levels:**
+```bash
+# View only warnings and errors
+sudo PYTHONLOGLEVEL=WARNING ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
+
+# View all messages including debug
+sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
+```
+
+### Log Levels Explained
+
+MeshPages uses four log levels to organize information:
+
+| Level | When Displayed | What You'll See |
+|-------|---|---|
+| **DEBUG** | Only with `PYTHONLOGLEVEL=DEBUG` | Chunk assembly details, packet decoding, protocol-level operations, route registration |
+| **INFO** | Default | Connections, major events, successful operations, important state changes |
+| **WARNING** | Default | Timeouts, client unreachable, request mismatches |
+| **ERROR** | Default | Failures, exceptions, protocol violations |
+
+### Example Debug Output
+
+```
+2026-04-18 14:32:45,123 - meshpages.meshpages_server - DEBUG - Server initialized with loop_interval=1.0s, timeout=60s, courtesy_interval=2.5s
+2026-04-18 14:32:45,124 - meshpages.meshpages_server - DEBUG - Registering route: /home (returns html)
+2026-04-18 14:32:46,456 - meshpages.meshpages_server - DEBUG - Received request from !abc123: type=html, route=<recognized>
+2026-04-18 14:32:46,457 - meshpages.meshpages_server - DEBUG - Successfully decoded HTML request from !abc123
+2026-04-18 14:32:46,458 - meshpages.meshpages_server - DEBUG - Sending HTML response chunk 1/1 to !abc123
+2026-04-18 14:32:46,459 - meshpages.meshpages_server - DEBUG - Transmitted HTML chunk 1/1
+2026-04-18 14:32:46,460 - meshpages.meshpages_server - INFO - Channel congestion: applied 0.50s backoff delay before sending HTML chunk to !abc123
+```
+
+### Debugging Common Issues
+
+**Issue**: "Received request from !abc123: type=html, route=\<<not found\>>"
+- DEBUG log shows the route wasn't recognized
+- Check that the endpoint path registered matches the request path exactly
+
+**Issue**: "Empty decompressed payload from !abc123, treating as text fallback"
+- DEBUG log shows decompression returned empty data
+- Could indicate corrupted transmission or incompatible compression
+
+**Issue**: Frequent backoff delays appearing in logs
+- Check channel utilization with `air_traffic_control_target_utilization_percent`
+- Monitor the `Applied backoff delay` INFO messages to see congestion patterns
+
 ### Code Style
 
 This project follows PEP 8 conventions with type hints throughout.

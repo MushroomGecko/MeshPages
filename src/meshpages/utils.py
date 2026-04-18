@@ -1,13 +1,8 @@
-import logging
-
 import brotli
 import meshtastic
 import meshtastic.serial_interface
 
 from meshpages.models import ResponsePacket
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 def parse_uri(uri: str) -> tuple[str, str]:
@@ -53,9 +48,8 @@ def compress_payload(payload: str) -> bytes:
         # Quality 11 provides maximum compression at the cost of slower compression speed
         # This is acceptable for offline compression scenarios
         return brotli.compress(payload.encode("utf-8"), quality=11)
-    except Exception as e:
+    except Exception:
         # Log compression errors but return empty bytes to allow graceful degradation
-        logger.error(f"Error compressing payload: {e}")
         return b""
 
 
@@ -72,9 +66,8 @@ def decompress_payload(payload: bytes) -> str:
     try:
         # Decompress the Brotli-compressed data and decode back to UTF-8 string
         return brotli.decompress(payload).decode("utf-8")
-    except Exception as e:
+    except Exception:
         # Log decompression errors but return empty string to allow graceful degradation
-        logger.error(f"Error decompressing payload: {e}")
         return ""
 
 
@@ -111,7 +104,6 @@ def encode_packet(response_packet: ResponsePacket) -> bytes:
     hex_bytes = f"{hex_current_chunk_id}{hex_total_chunks}{hex_status_code}".encode("utf-8")
     # Prepend header to the packet content (content is already Brotli-compressed)
     combined_bytes = hex_bytes + response_packet.content
-    logger.debug(f"Encoded packet: {combined_bytes}")
     return combined_bytes
 
 
@@ -141,21 +133,17 @@ def decode_packet(payload: bytes) -> ResponsePacket:
         # Extract and decode current chunk ID (bytes 0-1): 2 hex chars = 8 bits
         encoded_current_chunk_id = payload[0:2].decode("utf-8")
         decoded_current_chunk_id = int(encoded_current_chunk_id, 16)
-        logger.debug(f"Current chunk ID: {decoded_current_chunk_id}")
 
         # Extract and decode total chunks (bytes 2-3): 2 hex chars = 8 bits
         encoded_total_chunks = payload[2:4].decode("utf-8")
         decoded_total_chunks = int(encoded_total_chunks, 16)
-        logger.debug(f"Total chunks: {decoded_total_chunks}")
 
         # Extract and decode status code (bytes 4-6): 3 hex chars = 12 bits
         encoded_status_code = payload[4:7].decode("utf-8")
         decoded_status_code = int(encoded_status_code, 16)
-        logger.debug(f"Status code: {decoded_status_code}")
 
         # Remaining bytes (from byte 7 onwards) contain the Brotli-compressed content
         compressed_content = payload[7:]
-        logger.debug(f"Compressed content size: {len(compressed_content)} bytes")
 
         return ResponsePacket(
             current_chunk_id=decoded_current_chunk_id,
@@ -163,9 +151,8 @@ def decode_packet(payload: bytes) -> ResponsePacket:
             status_code=decoded_status_code,
             content=compressed_content,
         )
-    except Exception as e:
+    except Exception:
         # Log decoding errors with details for debugging packet format issues
-        logger.error(f"Error decoding packet: {e}")
         return None
 
 

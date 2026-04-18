@@ -1,4 +1,5 @@
 import logging
+import os
 import threading
 
 import meshtastic
@@ -8,8 +9,15 @@ from pubsub import pub
 from meshpages.models import ResponsePacket
 from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet, get_node_db_info
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    # Allow environment variable to override log level (default: INFO)
+    log_level = os.environ.get("PYTHONLOGLEVEL", "INFO").upper()
+    logger.setLevel(getattr(logging, log_level))
 
 # Meshtastic portnum for binary data transmission (used for encoded packets)
 PRIVATE_APP = "PRIVATE_APP"
@@ -75,10 +83,9 @@ class MeshPageClient:
             if not self.node_id:
                 logger.error("No node ID found")
                 raise ValueError("No node ID found")
-            logger.info(f"Connected to node with ID `{self.node_id}`")
+            logger.info(f"Connected to Meshtastic node: {self.node_id}")
         except Exception as e:
-            logger.error(f"Error in client: {e}")
-            logger.error(f"Failed to create serial interface with interface {usb_interface}")
+            logger.error(f"Failed to initialize Meshtastic interface (USB: {usb_interface}): {e}")
             raise
 
     def _validate_target_node(
@@ -96,9 +103,12 @@ class MeshPageClient:
         """
         # Prevent sending requests to ourselves (communication would be invalid)
         if target_node == self.node_id:
+            logger.debug(f"Target node {target_node} is the local node, rejecting self-request")
             return False
         # Check if the target node appears in our neighbor list (is reachable)
-        return target_node in self.interface.nodes
+        is_reachable = target_node in self.interface.nodes
+        logger.debug(f"Checking target node {target_node}: reachable={is_reachable}")
+        return is_reachable
 
     def _reset_state(self) -> None:
         """
@@ -138,7 +148,7 @@ class MeshPageClient:
         """
         # Handle case where we received no packet at all (timeout or protocol failure)
         if not response_packet:
-            logger.error("No response packet received.")
+            logger.warning("No response packet received - returning generic error")
             error_message = "<div style='color: orange;'>An unknown error occurred.</div>"
             self.payload_string = error_message
             self._reset_state()
@@ -147,16 +157,21 @@ class MeshPageClient:
 
         # Handle text error messages (usually from TEXT_MESSAGE_APP)
         if isinstance(response_packet, str):
-            self.payload_string = response_packet
+            logger.info(f"Received text error response: {response_packet[:100]}")
+            # Wrap in <pre> tag to preserve newlines and whitespace from server
+            formatted_message = f"<pre style='color: orange; white-space: pre-wrap; word-wrap: break-word; font-family: monospace;'>{response_packet}</pre>"
+            self.payload_string = formatted_message
             self._reset_state()
             self.response_event.set()
-            return response_packet
+            return formatted_message
 
         # Handle ResponsePacket with non-200 status code (error response from server)
         if isinstance(response_packet, ResponsePacket) and response_packet.status_code != 200:
             # Status code responses include plain text error messages (not compressed)
             response_packet_content = response_packet.content if isinstance(response_packet.content, str) else response_packet.content.decode("utf-8")
-            error_message = f"<div style='color: orange;'>Error Code: {response_packet.status_code}. {response_packet_content}</div>"
+            logger.info(f"Received error response from server: status={response_packet.status_code}")
+            # Wrap in <pre> tag to preserve newlines and whitespace from server
+            error_message = f"<pre style='color: orange; white-space: pre-wrap; word-wrap: break-word; font-family: monospace;'>Error Code: {response_packet.status_code}\n{response_packet_content}</pre>"
             self.payload_string = error_message
             self._reset_state()
             self.response_event.set()
@@ -189,7 +204,7 @@ class MeshPageClient:
         """
         # Ignore packets if we're not currently waiting for a response (no active request)
         if not self.target_node:
-            logger.info(f"Not interested in message from {packet.get('from', 'Unknown')}")
+            logger.debug(f"Ignoring message from {packet.get('fromId', 'Unknown')}: not waiting for response")
             return
 
         # Process the received packet and handle multi-chunk assembly
@@ -197,15 +212,15 @@ class MeshPageClient:
             decoded_message = packet.get("decoded", {})
             portnum = decoded_message.get("portnum", "")
             from_id = packet.get("fromId", "")
-            logger.info(f"Checking if message is for us: portnum={portnum}, from_id={from_id}, target_node={self.target_node}")
 
             if portnum == PRIVATE_APP and from_id == self.target_node:
                 # Decode the binary packet into a ResponsePacket structure
                 response_packet = decode_packet(decoded_message.get("payload", b""))
-                logger.debug(f"Response packet: {response_packet}")
+                logger.debug(f"Received PRIVATE_APP chunk from {from_id}: chunk {response_packet.current_chunk_id if response_packet else '?'}/{response_packet.total_chunks if response_packet else '?'}")
 
                 # Immediate error response: status code indicates server error, decompress and return
                 if response_packet and response_packet.status_code != 200:
+                    logger.info(f"Received error response from {from_id}: status={response_packet.status_code}")
                     self.payload_string = decompress_payload(response_packet.content)
                     self._reset_state()
                     self.response_event.set()
@@ -214,17 +229,20 @@ class MeshPageClient:
                 # On first chunk: record total chunk count for this response
                 if response_packet and not self.expected_total_chunks:
                     self.expected_total_chunks = response_packet.total_chunks
+                    logger.debug(f"Expecting {self.expected_total_chunks} total chunks from {from_id}")
 
                 # Intermediate chunk: buffer it and wait for more (unless it's the last chunk)
                 if response_packet and self.expected_total_chunks and response_packet.current_chunk_id != self.expected_total_chunks:
                     # Store this chunk in the buffer (chunk IDs are 1-indexed)
                     self.response_container[response_packet.current_chunk_id] = response_packet.content
+                    logger.debug(f"Buffered chunk {response_packet.current_chunk_id}/{self.expected_total_chunks}, waiting for more...")
                     return
 
                 # Final chunk received: assemble all chunks, decompress, and signal completion
                 elif response_packet and self.expected_total_chunks and response_packet.current_chunk_id == self.expected_total_chunks:
                     # Store the final chunk
                     self.response_container[response_packet.current_chunk_id] = response_packet.content
+                    logger.debug(f"Received final chunk {response_packet.current_chunk_id}/{self.expected_total_chunks}, assembling response...")
 
                     # TODO: Improve multi-chunk reassembly robustness:
                     #   - Validate all chunk IDs 1..N are present before joining (currently crashes if chunk missing)
@@ -236,7 +254,7 @@ class MeshPageClient:
                         self.payload_bytes += self.response_container[chunk_id]
                     # Decompress the complete payload
                     self.payload_string = decompress_payload(self.payload_bytes)
-                    logger.debug(f"Decompressed payload size: {len(self.payload_string)} characters")
+                    logger.info(f"Successfully received complete response from {from_id}: {len(self.payload_string)} characters")
 
                     # Reset state and signal the waiting thread that response is complete
                     self._reset_state()
@@ -246,18 +264,22 @@ class MeshPageClient:
                 # Unexpected state: missing packet, invalid chunk ID, or malformed response
                 else:
                     if not response_packet:
-                        logger.error("No response packet received.")
+                        logger.error("Failed to decode response packet")
                     if not self.expected_total_chunks:
-                        logger.error("No expected total chunks received.")
-                    logger.error(f"Unexpected response packet: {response_packet}.")
+                        logger.error("No expected total chunks set")
+                    logger.error(f"Unexpected response state from {from_id}: packet={response_packet}, expected_total={self.expected_total_chunks}")
                     return
 
             elif portnum == TEXT_MESSAGE_APP and from_id == self.target_node:
                 # TEXT_MESSAGE_APP responses are plain text error messages (not multi-chunk)
                 message = decoded_message.get("text", "")
+                logger.debug(f"Received TEXT_MESSAGE_APP from {from_id}")
                 self._handle_error_response(message if message else None)
+            elif from_id == self.target_node:
+                # Message from target but wrong portnum
+                logger.debug(f"Received message from target {from_id} with unexpected portnum: {portnum}")
         except Exception as e:
-            logger.error(f"Error receiving message: {e}")
+            logger.error(f"Error processing received message from {packet.get('fromId', 'Unknown')}: {e}")
             self._handle_error_response(None)
             return
 
@@ -288,10 +310,12 @@ class MeshPageClient:
         if not self._validate_target_node(node_id):
             # Target node not found; check for special case of self-request
             if node_id == self.node_id:
+                logger.info(f"Rejected self-request for {path}")
                 return "<div style='color: orange;'>You cannot request a page from yourself.</div>"
 
             # Build user-friendly error message with available nodes for reference
             available_nodes = get_node_db_info(self.interface)
+            logger.info(f"Target node {node_id} not reachable. Available nodes: {list(available_nodes.keys())}")
             html_return_string = f"<div style='color: orange;'>Invalid target node: {node_id}. Available nodes:<ul>"
 
             # Format each available node with identification and local node indicator
@@ -300,8 +324,9 @@ class MeshPageClient:
                 html_return_string += f"<li>{node}: {available_nodes[node]['longName']} ({available_nodes[node]['shortName']}) {local_indicator}</li>"
 
             html_return_string += "</ul></div>"
-            logger.error(f"Available nodes: {available_nodes}")
             return html_return_string
+
+        logger.info(f"Requesting {path} from {node_id}")
 
         # Initialize state for this request: clear previous response data and set new target
         self.target_node = node_id
@@ -322,6 +347,7 @@ class MeshPageClient:
         )
 
         # Send the page request to the target node (as a binary message)
+        logger.debug(f"Sending page request ({len(encoded_payload)} bytes) to {node_id}")
         self.interface.sendData(
             encoded_payload,
             destinationId=node_id,
@@ -333,8 +359,9 @@ class MeshPageClient:
 
         if response:
             # Response completed successfully: return the decompressed content
+            logger.info(f"Successfully retrieved response from {node_id}")
             return self.payload_string
         else:
             # Timeout waiting for response: return user-friendly error message
-            logger.warning(f"Timeout: {node_id} didn't reply within {self.timeout} seconds.")
+            logger.warning(f"Timeout: {node_id} didn't reply within {self.timeout} seconds for path {path}")
             return f"<div style='color: orange;'>Timeout: {node_id} didn't reply.</div>"

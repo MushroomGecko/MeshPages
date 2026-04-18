@@ -1,5 +1,6 @@
 import logging
 import math
+import os
 import time
 import threading
 from queue import Queue
@@ -16,8 +17,15 @@ from meshpages.channel_presets import ChannelPresets
 from meshpages.models import Config, ResponsePacket, User
 from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    # Allow environment variable to override log level (default: INFO)
+    log_level = os.environ.get("PYTHONLOGLEVEL", "INFO").upper()
+    logger.setLevel(getattr(logging, log_level))
 
 # Buffer offset for the packet header
 BUFFER_OFFSET = 7
@@ -92,14 +100,14 @@ class MeshPageServer:
             if not self.node_id:
                 logger.error("No node ID found")
                 raise ValueError("No node ID found")
-            logger.info(f"Connected to node with ID `{self.node_id}`")
+            logger.info(f"Connected to Meshtastic node: {self.node_id}")
         except Exception as e:
-            logger.error(f"Error in server: {e}")
-            logger.error(f"Failed to create serial interface with interface {usb_interface}")
+            logger.error(f"Failed to initialize Meshtastic interface (USB: {usb_interface}): {e}")
             raise
 
         # Dictionary mapping request paths to handler functions and their response types
         self.routes = {}
+        logger.debug(f"Server initialized with loop_interval={loop_interval}s, timeout={timeout}s, courtesy_interval={courtousy_interval}s")
         # How often (in seconds) to wake up and process the response queue
         self.loop_interval = loop_interval
         # Delay between sending consecutive response chunks to prevent overwhelming receivers
@@ -185,9 +193,7 @@ class MeshPageServer:
         """
         # Calculate safe payload size: reserve space for packet header and metadata
         payload_length = DATA_PAYLOAD_LEN - BUFFER_OFFSET
-        logger.debug(f"DATA_PAYLOAD_LEN: {DATA_PAYLOAD_LEN}")
-        logger.debug(f"Buffer offset: {BUFFER_OFFSET}")
-        logger.debug(f"Payload length: {payload_length}")
+        logger.debug(f"Calculating chunks: payload_length={payload_length}, buffer_offset={BUFFER_OFFSET}")
 
         # Error responses are always sent as single chunk (not split across multiple packets)
         if status_code != 200:
@@ -219,6 +225,7 @@ class MeshPageServer:
 
         # Prevent payload from exceeding maximum packet count (255 is the limit)
         if total_chunks > 255:
+            logger.error(f"Payload too large: requires {total_chunks} chunks, max is 255. Sending error response.")
             total_chunks = 1
             status_code = 500
             payload = "Too many chunks to send. Please try again later.".encode("utf-8")
@@ -260,6 +267,7 @@ class MeshPageServer:
         Raises:
             ValueError: If response_type is not "html" or "text".
         """
+        logger.info(f"Sending response to {destination_id}: status={status_code}, type={response_type}")
         if response_type == "html":
             # Remove unnecessary whitespace and HTML comments from the response to reduce size
             response_string = minify_html_onepass.minify(response_string)
@@ -272,7 +280,7 @@ class MeshPageServer:
             for response_packet in self._get_chunks(compressed_response_string, status_code=status_code):
                 # Encode the response packet into a byte sequence
                 chunk = encode_packet(response_packet)
-                logger.debug(f"Sending chunk {response_packet.current_chunk_id} of {response_packet.total_chunks} to {destination_id}")
+                logger.debug(f"Sending HTML response chunk {response_packet.current_chunk_id}/{response_packet.total_chunks} to {destination_id}")
 
                 # Prepare for TCP-style acknowledgment: set up state for potential retries
                 if self.message_ack:
@@ -288,10 +296,13 @@ class MeshPageServer:
                     self.response_event.clear()
 
                 # Check channel utilization and apply backoff delay if needed
-                self.air_traffic_control.apply_backoff_delay()
+                backoff_delay = self.air_traffic_control.apply_backoff_delay()
+                if backoff_delay > 0.0:
+                    logger.info(f"Channel congestion: applied {backoff_delay:.2f}s backoff delay before sending HTML chunk to {destination_id}")
 
                 # Send the encoded packet to the destination node with acknowledgment request
                 self.interface.sendData(chunk, destinationId=destination_id, wantAck=self.message_ack)
+                logger.debug(f"Transmitted HTML chunk {response_packet.current_chunk_id}/{response_packet.total_chunks}")
 
                 # Wait for ACK (sets current_send_status and signals event when received or timed out)
                 if self.message_ack:
@@ -317,7 +328,7 @@ class MeshPageServer:
             for response_packet in self._get_chunks(response_string, status_code=status_code):
                 # Get the current chunk of the response
                 chunk = response_packet.content
-                logger.debug(f"Sending chunk {response_packet.current_chunk_id} of {response_packet.total_chunks} to {destination_id}")
+                logger.debug(f"Sending text response chunk {response_packet.current_chunk_id}/{response_packet.total_chunks} to {destination_id}")
 
                 # Prepare for TCP-style acknowledgment: set up state for potential retries
                 if self.message_ack:
@@ -333,10 +344,13 @@ class MeshPageServer:
                     self.response_event.clear()
 
                 # Check channel utilization and apply backoff delay if needed
-                self.air_traffic_control.apply_backoff_delay()
+                backoff_delay = self.air_traffic_control.apply_backoff_delay()
+                if backoff_delay > 0.0:
+                    logger.info(f"Channel congestion: applied {backoff_delay:.2f}s backoff delay before sending text chunk to {destination_id}")
 
                 # Send the text message to the destination node with acknowledgment request
                 self.interface.sendText(chunk, destinationId=destination_id, wantAck=self.message_ack)
+                logger.debug(f"Transmitted text chunk {response_packet.current_chunk_id}/{response_packet.total_chunks}")
 
                 # Wait for ACK (sets current_send_status and signals event when received or timed out)
                 if self.message_ack:
@@ -348,10 +362,9 @@ class MeshPageServer:
                     self._reset_client_state()
                     return
 
-                logger.info(f"Sent text message to {destination_id}: {response_packet.content}")
-
                 # Record packet transmission for air traffic control tracking
                 self.air_traffic_control.add_packet_sent(len(response_packet.content))
+                logger.debug(f"Text response chunk recorded for air traffic control ({len(response_packet.content)} bytes)")
 
                 # Stop sending further chunks if error status (error responses are single-chunk only)
                 if status_code != 200:
@@ -378,6 +391,7 @@ class MeshPageServer:
         Returns:
             None
         """
+        logger.debug(f"Queuing error response to {from_id}: status={status_code}")
         self.user_queue.put(
             User(
                 from_id=from_id,
@@ -420,21 +434,20 @@ class MeshPageServer:
 
             # Perform the retry logic for the current client if needed
             if portnum == ROUTING_APP and from_id == self.current_client_node_id:
-                print(f"Received routing message from current client: {decoded_message}")
+                logger.debug(f"Received routing message from {from_id}")
                 # Get the routing metadata from the decoded message
                 routing = decoded_message.get("routing", {})
                 # Get the error reason from the routing metadata
                 error_reason = routing.get("errorReason", None)
                 # Convert the error reason to None if it is "NONE"
                 error_reason = None if error_reason == "NONE" else error_reason
-                print(type(error_reason))
-                print(f"Error reason: {error_reason}")
+                logger.debug(f"Routing error reason from {from_id}: {error_reason}")
 
                 # Determine retry logic: error_reason present means transmission failed at client
                 if error_reason and self.current_event_retries < self.event_retries:
                     # Client reported an error and we haven't exceeded max retries
                     if self.current_client_message and self.response_type:
-                        logger.info(f"Retrying message to {self.current_client_node_id} (attempt {self.current_event_retries + 1}/{self.event_retries})")
+                        logger.info(f"Retrying message to {self.current_client_node_id} (attempt {self.current_event_retries + 1}/{self.event_retries}), error: {error_reason}")
                         # Resend the cached chunk using the same method (sendData for html, sendText for text)
                         if self.response_type == "html":
                             self.interface.sendData(self.current_client_message, destinationId=self.current_client_node_id, wantAck=self.message_ack)
@@ -457,6 +470,7 @@ class MeshPageServer:
                     # Signal success to the sender: it will continue to next chunk
                     self.current_send_status = True
                     self.response_event.set()
+                    logger.debug(f"Received successful ACK from {from_id}")
                 return
 
             # Any ROUTING_APP not for the current client we're tracking, ignore it
@@ -478,8 +492,6 @@ class MeshPageServer:
                 logger.error(f"Invalid portnum: {portnum}")
                 return
 
-            logger.info(f"Received a message from {from_id}: {text if isinstance(text, str) else f'<binary data {len(text)} bytes>'}")
-
             message_request_type = None
 
             try:
@@ -490,14 +502,17 @@ class MeshPageServer:
                     # Successfully decoded and decompressed: this is a web client request
                     text = decompressed_payload
                     message_request_type = "html"
+                    logger.debug(f"Successfully decoded HTML request from {from_id}")
                 else:
                     # Decoded but decompressed to empty: treat as text fallback
-                    logger.error("No decompressed payload found")
+                    logger.debug(f"Empty decompressed payload from {from_id}, treating as text fallback")
                     message_request_type = "text"
             except Exception as e:
                 # Failed to decode as packet: this is a plain text request (Meshtastic app)
-                logger.error(f"Error decoding packet: {e}")
+                logger.debug(f"Failed to decode as binary packet from {from_id} (expected for text requests): {type(e).__name__}")
                 message_request_type = "text"
+
+            logger.debug(f"Received request from {from_id}: type={message_request_type}, route={'<recognized>' if text in self.routes else '<not found>'}")
 
             # Check if the message is a valid endpoint
             if text and text in self.routes:
@@ -508,6 +523,7 @@ class MeshPageServer:
                 # Validate that the client type matches the endpoint's expected type
                 # Send user-friendly error messages for common mismatches
                 if message_request_type == "text" and intended_return_type == "html":
+                    logger.info(f"Request mismatch from {from_id}: text client requesting HTML endpoint {text}")
                     self._throw_error_response(
                         from_id,
                         "This endpoint requires the MeshPages web client. Please use the web client instead of the Meshtastic app.",
@@ -515,6 +531,7 @@ class MeshPageServer:
                     )
                     return
                 elif message_request_type == "html" and intended_return_type == "text":
+                    logger.info(f"Request mismatch from {from_id}: HTML client requesting text endpoint {text}")
                     self._throw_error_response(
                         from_id,
                         "This endpoint requires the Meshtastic app. Please use the Meshtastic app instead of the MeshPages web client.",
@@ -523,6 +540,7 @@ class MeshPageServer:
                     return
                 # Catch unexpected request types (edge case: malformed or hacked requests)
                 elif message_request_type != intended_return_type:
+                    logger.warning(f"Unexpected request type mismatch from {from_id}: request_type={message_request_type}, expected={intended_return_type}")
                     self._throw_error_response(
                         from_id,
                         f"Message request type {message_request_type} does not match intended return type {intended_return_type}",
@@ -546,10 +564,12 @@ class MeshPageServer:
                         time_received=time.time(),
                     )
                 )
+                logger.info(f"Request from {from_id} for {text} queued for response (status={status_code})")
 
                 return
             else:
                 # Route not found: compile list of available routes to suggest to the user
+                logger.info(f"Route not found from {from_id}: requested {text}, available routes: {list(self.routes.keys())}")
                 text_routes = []
                 html_routes = []
 
@@ -590,6 +610,7 @@ class MeshPageServer:
         while not self.user_queue.empty():
             # Get the next client request from the queue
             user: User = self.user_queue.get()
+            logger.debug(f"Processing queued request from {user.from_id}, queue size now: {self.user_queue.qsize()}")
             # Process the request and send response, with error handling
             try:
                 # Check if too much time has passed since the client made this request
@@ -600,7 +621,7 @@ class MeshPageServer:
                     self._send_chunked_response(user.result, user.intended_return_type, user.status_code, user.from_id)
             except Exception as e:
                 # Log transmission errors but continue processing the queue
-                logger.error(f"Error processing user queue: {e}")
+                logger.error(f"Error processing user queue for {user.from_id}: {e}")
                 pass
             finally:
                 # Mark the task as complete (required for Queue.join() to work properly)
@@ -632,7 +653,7 @@ class MeshPageServer:
 
         # Define the inner decorator function that performs the registration
         def decorator(func: Callable):
-            logger.info(f"GET request for {path}")
+            logger.debug(f"Registering route: {path} (returns {intended_return_type})")
             # Store the handler function and its response type in the routes dictionary
             self.routes[path] = {
                 "func": func,
@@ -645,6 +666,7 @@ class MeshPageServer:
             logger.error(f"Invalid intended return type: {intended_return_type}. Must be one of: {INTENDED_RETURN_TYPES}")
             raise ValueError(f"Invalid intended return type: {intended_return_type}. Must be one of: {INTENDED_RETURN_TYPES}")
 
+        logger.info(f"Route registered: {path} -> {intended_return_type}")
         return decorator
 
     def run(self) -> None:
@@ -672,6 +694,9 @@ class MeshPageServer:
             logger.info(f"Device Metrics: {self.node_info.get('deviceMetrics', {})}")
             logger.info(f"Is Favorite: {self.node_info.get('isFavorite', False)}")
 
+            logger.info(f"Server started with {len(self.routes)} routes registered")
+            logger.info("Server ready and listening for requests")
+
             # Main server loop: continuously process incoming requests and outgoing responses
             while True:
                 # Wake up periodically to process queued responses
@@ -679,7 +704,11 @@ class MeshPageServer:
 
                 # Send all queued responses to their destination clients
                 self._process_user_queue()
+        except KeyboardInterrupt:
+            logger.info("Server interrupted by user")
+            logger.info("Shutting down...")
+            self.interface.close()
         except Exception as e:
-            logger.error(f"Error in server: {e}")
+            logger.error(f"Fatal error in server: {e}")
             logger.info("Shutting down...")
             self.interface.close()
