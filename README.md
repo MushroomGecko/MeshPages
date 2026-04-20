@@ -2,14 +2,13 @@
 
 MeshPages enables web-based communication over Meshtastic mesh networks. It allows you to request and serve web pages directly over Meshtastic radios, turning your Meshtastic device into a wireless web server or client.
 
-<img style="width: 50%; height: auto;" alt="MeshPages_Client_Screenshot" src="https://github.com/user-attachments/assets/6bc72c0c-0e82-4a2c-9834-d57a31a102e5" />
+
 
 The MeshPages Web Client getting a result from the example `/home` endpoint from the `examples/simple_responses` server.
 
-<img style="width: 30%; height: auto;" alt="MeshPages_Client_Screenshot" src="https://github.com/user-attachments/assets/9ae3c4f4-0057-4e52-84d6-50dbff507857" />
-<img style="width: 30%; height: auto;" alt="MeshPages_Client_Screenshot" src="https://github.com/user-attachments/assets/3685bd5c-cfd5-4419-99b2-a9ca28c88d84" />
 
-The Meshtastic Android App getting experiencing a non-existent endpoint, trying to get the MeshPages exclusive `/home` endpoint, and getting the Meshtastic App compatible `/bees` endpoint from the `examples/simple_responses` server.
+
+The Meshtastic Android App experiencing a non-existent endpoint, trying to get the MeshPages exclusive `/home` endpoint, and getting the Meshtastic App compatible `/bees` endpoint from the `examples/simple_responses` server.
 
 ## Features
 
@@ -504,16 +503,19 @@ MeshPages includes comprehensive logging at multiple levels. By default, only IN
 Set the `PYTHONLOGLEVEL` environment variable before running. Place it after `sudo` so it gets passed to the Python process:
 
 **Client with Debug Logging:**
+
 ```bash
 sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
 ```
 
 **Server with Debug Logging:**
+
 ```bash
 sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python examples/simple_responses/server.py --usb-interface /dev/ttyUSB0
 ```
 
 **Try other log levels:**
+
 ```bash
 # View only warnings and errors
 sudo PYTHONLOGLEVEL=WARNING ./.venv/bin/python client.py --interface-type usb --interface-path /dev/ttyUSB1
@@ -526,12 +528,14 @@ sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python client.py --interface-type usb --in
 
 MeshPages uses four log levels to organize information:
 
-| Level | When Displayed | What You'll See |
-|-------|---|---|
-| **DEBUG** | Only with `PYTHONLOGLEVEL=DEBUG` | Chunk assembly details, packet decoding, protocol-level operations, route registration |
-| **INFO** | Default | Connections, major events, successful operations, important state changes |
-| **WARNING** | Default | Timeouts, client unreachable, request mismatches |
-| **ERROR** | Default | Failures, exceptions, protocol violations |
+
+| Level       | When Displayed                   | What You'll See                                                                        |
+| ----------- | -------------------------------- | -------------------------------------------------------------------------------------- |
+| **DEBUG**   | Only with `PYTHONLOGLEVEL=DEBUG` | Chunk assembly details, packet decoding, protocol-level operations, route registration |
+| **INFO**    | Default                          | Connections, major events, successful operations, important state changes              |
+| **WARNING** | Default                          | Timeouts, client unreachable, request mismatches                                       |
+| **ERROR**   | Default                          | Failures, exceptions, protocol violations                                              |
+
 
 ### Example Debug Output
 
@@ -547,15 +551,18 @@ MeshPages uses four log levels to organize information:
 
 ### Debugging Common Issues
 
-**Issue**: "Received request from !abc123: type=html, route=\<<not found\>>"
+**Issue**: "Received request from !abc123: type=html, route=<not found>"
+
 - DEBUG log shows the route wasn't recognized
 - Check that the endpoint path registered matches the request path exactly
 
 **Issue**: "Empty decompressed payload from !abc123, treating as text fallback"
+
 - DEBUG log shows decompression returned empty data
 - Could indicate corrupted transmission or incompatible compression
 
 **Issue**: Frequent backoff delays appearing in logs
+
 - Check channel utilization with `air_traffic_control_target_utilization_percent`
 - Monitor the `Applied backoff delay` INFO messages to see congestion patterns
 
