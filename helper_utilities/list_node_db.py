@@ -11,16 +11,24 @@ import argparse
 
 import meshtastic
 import meshtastic.serial_interface
+import meshtastic.stream_interface
 
-from meshpages.utils import get_node_db_info
+from meshpages.utils import get_node_db_info, parse_hostname
 
-# Create CLI argument parser for specifying USB interface
+# Create CLI argument parser for specifying interface connection
 parser = argparse.ArgumentParser(description="List nodes in the Meshtastic mesh network database")
 parser.add_argument(
-    "--usb-interface",
+    "--interface-type",
+    type=str,
+    choices=["usb", "bluetooth", "host"],
+    default="usb",
+    help="Connection type for the radio (usb, bluetooth, or host). Defaults to usb.",
+)
+parser.add_argument(
+    "--interface-path",
     type=str,
     default=None,
-    help="USB interface for the radio connection (e.g., /dev/ttyUSB0). If not specified, uses default.",
+    help="Path for the connection: device path for USB/Bluetooth (e.g., /dev/ttyUSB0), or 'hostname:port' for host connections (e.g., 192.168.1.100:4403).",
 )
 args = parser.parse_args()
 
@@ -34,16 +42,28 @@ def list_node_db() -> None:
     node's long name, short name, and local node indicator are printed.
 
     Raises:
-        SerialException: If unable to connect to the radio device.
+        ValueError: If connection configuration is invalid.
+        Exception: If unable to connect to the radio device.
 
     Returns:
         None
     """
-    # Get the USB interface from CLI arguments, defaulting to auto-detection
-    usb_interface = None if not args.usb_interface else args.usb_interface
+    # Get connection parameters from CLI arguments
+    connection_type = args.interface_type
+    interface_path = args.interface_path
 
-    # Connect to the radio device
-    interface = meshtastic.serial_interface.SerialInterface(usb_interface)
+    # Connect to the radio device via the specified interface
+    if connection_type == "usb":
+        interface = meshtastic.serial_interface.SerialInterface(interface_path)
+    elif connection_type == "bluetooth":
+        interface = meshtastic.bluetooth_interface.BluetoothInterface(interface_path)
+    elif connection_type == "host":
+        if not interface_path:
+            raise ValueError("Host connection requires interface_path in format 'hostname:port' or 'hostname' (defaults to port 4403)")
+        hostname, port = parse_hostname(interface_path)
+        interface = meshtastic.tcp_interface.TCPInterface(hostname, portNumber=port)
+    else:
+        raise ValueError(f"Invalid connection configuration. Got connection_type={connection_type!r}, interface_path={interface_path!r}. " f"Expected one of: " f"(usb, str path like '/dev/ttyUSB0'), " f"(bluetooth, str path like '/dev/rfcomm0'), " f"(host, str like 'hostname:port' or 'hostname' for default port)")
 
     # Retrieve the node database from the connected radio
     nodes = get_node_db_info(interface)
