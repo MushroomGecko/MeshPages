@@ -24,7 +24,10 @@ The Meshtastic Android App getting experiencing a non-existent endpoint, trying 
 
 ### Prerequisites
 
-- A Meshtastic radio (e.g., Heltec V3, RAK Wireless) connected via USB
+- A Meshtastic radio (e.g., Heltec V3, RAK Wireless) connected via:
+  - USB serial port
+  - Bluetooth (BLE)
+  - Network/TCP (hostname or IP address)
 - Python 3.14 or later
 - Git
 
@@ -89,13 +92,30 @@ pip install .
 
 ### Finding Your Radios
 
-Before connecting to your Meshtastic radio, you can discover available USB devices:
+Before connecting to your Meshtastic radio, you can discover available devices:
 
 ```bash
 ./.venv/bin/python helper_utilities/find_radios.py
 ```
 
-This will list all connected Meshtastic radios and their device paths (e.g., `/dev/ttyUSB0`).
+This will list all connected Meshtastic radios organized by connection type:
+
+```
+============================================================
+Meshtastic Device Discovery
+============================================================
+
+[USB Connections]
+  - /dev/ttyUSB0
+
+[Bluetooth Connections]
+  - MESH_1111 (AA:BB:CC:DD:EE:FF)
+  - MESH_2222 (11:22:33:44:55:66)
+
+[Host Connections (TCP/Network)]
+  (Device discovery not yet available - use hostname:port manually)
+  (Example: 192.168.1.100:4403)
+```
 
 **Note**: On Linux, accessing `/dev/ttyUSB`* typically requires elevated privileges. You may need to use `sudo` to access your radio.
 
@@ -151,13 +171,33 @@ The web client allows you to request pages from mesh nodes and view them in a we
 
 ### Running the Client
 
-#### With USB Device Specification (Recommended)
+#### USB Connection (Recommended)
 
 ```bash
-sudo ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
+sudo ./.venv/bin/python client.py --interface-type usb --interface-path /dev/ttyUSB0
 ```
 
-#### Without CLI Arguments (Auto-detect)
+#### Bluetooth Connection
+
+```bash
+# Using device name
+sudo ./.venv/bin/python client.py --interface-type bluetooth --interface-path MESH_1111
+
+# Or using MAC address
+sudo ./.venv/bin/python client.py --interface-type bluetooth --interface-path AA:BB:CC:DD:EE:FF
+```
+
+#### Host Connection (TCP/Network)
+
+```bash
+# Using default port (4403)
+sudo ./.venv/bin/python client.py --interface-type host --interface-path 192.168.1.100
+
+# Using custom port
+sudo ./.venv/bin/python client.py --interface-type host --interface-path 192.168.1.100:5000
+```
+
+#### Auto-detect (USB only)
 
 ```bash
 sudo ./.venv/bin/python client.py
@@ -182,12 +222,33 @@ MeshPages uses a FastAPI-inspired decorator pattern for defining routes. Creatin
 ```python
 from meshpages import MeshPageServer
 
-# Create a server instance
+# Create a server instance - USB connection (auto-detect)
 app = MeshPageServer(
-    usb_interface="/dev/ttyUSB0",  # or None to auto-detect
     timeout=60,
     courtousy_interval=2.5,
 )
+
+# Or specify connection explicitly:
+# USB with specific device
+# app = MeshPageServer(
+#     connection_type="usb",
+#     interface_path="/dev/ttyUSB0",
+#     timeout=60,
+# )
+
+# Bluetooth connection
+# app = MeshPageServer(
+#     connection_type="bluetooth",
+#     interface_path="MESH_1111",  # or "AA:BB:CC:DD:EE:FF"
+#     timeout=60,
+# )
+
+# Host (TCP/Network) connection
+# app = MeshPageServer(
+#     connection_type="host",
+#     interface_path="192.168.1.100:4403",
+#     timeout=60,
+# )
 
 # Define routes using decorators
 @app.page("/home", intended_return_type="html")
@@ -225,11 +286,27 @@ This example demonstrates:
 
 ## Server Configuration
 
+### Connection Parameters
+
+#### `connection_type` (str, default: "usb")
+
+Type of connection to the Meshtastic device:
+
+- `"usb"` - Serial connection via USB
+- `"bluetooth"` - Bluetooth Low Energy (BLE) connection
+- `"host"` - Network connection via TCP/IP
+
+#### `interface_path` (str, optional)
+
+Path or address for connecting to the device. Format depends on connection type:
+
+- **USB**: Device path (e.g., `/dev/ttyUSB0`)
+- **Bluetooth**: Device name (e.g., `MESH_1111`) or MAC address (e.g., `AA:BB:CC:DD:EE:FF`)
+- **Host**: Hostname/IP with optional port (e.g., `192.168.1.100` or `192.168.1.100:4403`)
+
+For USB connections, `None` will auto-detect the first available device.
+
 ### Basic Options
-
-#### `usb_interface` (str, optional)
-
-USB device path for the Meshtastic radio (e.g., `/dev/ttyUSB0`). If `None`, auto-detects the first available radio.
 
 #### `timeout` (int, default: 60)
 
@@ -296,7 +373,8 @@ from meshpages import MeshPageServer, Config
 from meshpages.channel_presets import ChannelPresets
 
 app = MeshPageServer(
-    usb_interface="/dev/ttyUSB0",
+    connection_type="usb",
+    interface_path="/dev/ttyUSB0",
     timeout=120,                                        # Wait up to 2 minutes for responses
     courtousy_interval=1.0,                           # Fast chunk transmission
     loop_interval=0.5,                                # Check queue frequently
@@ -311,7 +389,7 @@ app = MeshPageServer(
 
 ### find_radios.py
 
-Discover all connected Meshtastic radios on your system:
+Discover all connected Meshtastic radios on your system, organized by connection type:
 
 ```bash
 ./.venv/bin/python helper_utilities/find_radios.py
@@ -320,25 +398,39 @@ Discover all connected Meshtastic radios on your system:
 Output:
 
 ```
-Found Meshtastic devices on:
-- /dev/ttyUSB0
-- /dev/ttyUSB1
+============================================================
+Meshtastic Device Discovery
+============================================================
+
+[USB Connections]
+  - /dev/ttyUSB0
+
+[Bluetooth Connections]
+  - MESH_1111 (AA:BB:CC:DD:EE:FF)
+
+[Host Connections (TCP/Network)]
+  (Device discovery not yet available - use hostname:port manually)
+  (Example: 192.168.1.100:4403)
 ```
 
-Use this to identify device paths for the `--usb-interface` parameter.
+Use USB paths for the `--interface-path` parameter with `--interface-type usb`, device names for `--interface-type bluetooth`, and hostname:port for `--interface-type host`.
 
 ### list_node_db.py
 
 List all nodes currently stored in the Meshtastic mesh network database:
 
 ```bash
+# USB connection (auto-detect)
 sudo ./.venv/bin/python helper_utilities/list_node_db.py
-```
 
-Or specify a USB interface explicitly:
+# Specify connection type and path
+sudo ./.venv/bin/python helper_utilities/list_node_db.py --interface-type usb --interface-path /dev/ttyUSB0
 
-```bash
-sudo ./.venv/bin/python helper_utilities/list_node_db.py --usb-interface /dev/ttyUSB0
+# Bluetooth connection
+sudo ./.venv/bin/python helper_utilities/list_node_db.py --interface-type bluetooth --interface-path MESH_1111
+
+# Host connection
+sudo ./.venv/bin/python helper_utilities/list_node_db.py --interface-type host --interface-path 192.168.1.100:4403
 ```
 
 Output:
@@ -361,19 +453,24 @@ This utility helps you identify all node IDs in your mesh network, including you
 **Solution**: Use `sudo` with the full path to the venv Python:
 
 ```bash
-sudo ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
+sudo ./.venv/bin/python client.py --interface-type usb --interface-path /dev/ttyUSB1
 ```
 
-### Multiple Serial Ports Detected
+### Multiple Serial Ports or Devices Detected
 
 **Problem**: "Multiple serial ports were detected so one serial port must be specified"
 
-**Solution**: Specify the Meshtastic device explicitly:
+**Solution**: Specify the Meshtastic device explicitly using `--interface-type` and `--interface-path`:
 
 ```bash
-sudo ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
-# or
-sudo ./.venv/bin/python examples/simple_responses/server.py --usb-interface /dev/ttyUSB0
+# USB device
+sudo ./.venv/bin/python client.py --interface-type usb --interface-path /dev/ttyUSB1
+
+# Bluetooth device
+sudo ./.venv/bin/python client.py --interface-type bluetooth --interface-path MESH_1111
+
+# Host connection
+sudo ./.venv/bin/python client.py --interface-type host --interface-path 192.168.1.100:4403
 ```
 
 ### Timeout Errors
@@ -419,10 +516,10 @@ sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python examples/simple_responses/server.py
 **Try other log levels:**
 ```bash
 # View only warnings and errors
-sudo PYTHONLOGLEVEL=WARNING ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
+sudo PYTHONLOGLEVEL=WARNING ./.venv/bin/python client.py --interface-type usb --interface-path /dev/ttyUSB1
 
 # View all messages including debug
-sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python client.py --usb-interface /dev/ttyUSB1
+sudo PYTHONLOGLEVEL=DEBUG ./.venv/bin/python client.py --interface-type usb --interface-path /dev/ttyUSB1
 ```
 
 ### Log Levels Explained
