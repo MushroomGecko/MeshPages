@@ -7,8 +7,10 @@ from queue import Queue
 from typing import Callable, Iterator, Literal, Union
 
 import meshtastic
+import meshtastic.ble_interface
 import meshtastic.serial_interface
 import meshtastic.stream_interface
+import meshtastic.tcp_interface
 import meshtastic.version
 import minify_html_onepass
 from pubsub import pub
@@ -57,7 +59,7 @@ class MeshPagesServer:
     def __init__(
         self,
         connection_type: Literal["usb", "bluetooth", "host"] = "usb",
-        interface_path: str = None,  # Path for connection: string for USB/Bluetooth (e.g. /dev/ttyUSB0, /dev/rfcomm0), or "hostname:port" for host
+        interface_path: str = None,  # Path for connection: device path for USB (e.g. /dev/ttyUSB0), device name/MAC for Bluetooth (e.g. MESH_1111 or AA:BB:CC:DD:EE:FF), or "hostname:port" for host
         loop_interval: float = 1.0,  # in seconds
         timeout: int = 60,  # in seconds
         courtousy_interval: float = 2.5,  # in seconds
@@ -73,7 +75,8 @@ class MeshPagesServer:
         Parameters:
             connection_type (str): The type of connection to use ("usb", "bluetooth", "host"). Defaults to "usb".
             interface_path (str, optional): The path to the interface to use. Defaults to None (auto-detect).
-                For USB/Bluetooth: device path (e.g., '/dev/ttyUSB0')
+                For USB: device path (e.g., '/dev/ttyUSB0')
+                For Bluetooth: device name (e.g., 'MESH_1111') or MAC address (e.g., 'AA:BB:CC:DD:EE:FF')
                 For host: "hostname:port" format (e.g., '192.168.1.100:4403')
             loop_interval (float): How often to process the user queue (seconds). Defaults to 1.0.
             timeout (int): Maximum time to wait before dropping a client request (seconds). Defaults to 60.
@@ -96,14 +99,19 @@ class MeshPagesServer:
             if connection_type == "usb":
                 self.interface = meshtastic.serial_interface.SerialInterface(interface_path)
             elif connection_type == "bluetooth":
-                self.interface = meshtastic.bluetooth_interface.BluetoothInterface(interface_path)
+                self.interface = meshtastic.ble_interface.BLEInterface(interface_path)
             elif connection_type == "host":
                 if not interface_path:
                     raise ValueError("Host connection requires interface_path in format 'hostname:port' or 'hostname' (defaults to port 4403)")
                 hostname, port = parse_hostname(interface_path)
                 self.interface = meshtastic.tcp_interface.TCPInterface(hostname, portNumber=port)
             else:
-                raise ValueError(f"Invalid connection configuration. Got connection_type={connection_type!r}, interface_path={interface_path!r}. " f"Expected one of: " f"(usb, str path like '/dev/ttyUSB0'), " f"(bluetooth, str path like '/dev/rfcomm0'), " f"(host, str like 'hostname:port' or 'hostname' for default port)")
+                raise ValueError(
+                    f"Invalid connection configuration. Got connection_type={connection_type!r}, interface_path={interface_path!r}." "Expected one of: ",
+                    "(usb, str path like '/dev/ttyUSB0')",
+                    "(bluetooth, str name like 'MESH_1111' or MAC like 'AA:BB:CC:DD:EE:FF')",
+                    "(host, str like 'hostname:port' or 'hostname' for default port)",
+                )
 
             # Retrieve local device information from the connected radio
             self.node_info = self.interface.getMyNodeInfo()

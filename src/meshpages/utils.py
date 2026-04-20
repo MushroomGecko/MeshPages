@@ -1,5 +1,6 @@
 import brotli
 import meshtastic
+import meshtastic.ble_interface
 import meshtastic.stream_interface
 
 from meshpages.models import ResponsePacket

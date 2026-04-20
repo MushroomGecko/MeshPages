@@ -28,7 +28,7 @@ parser.add_argument(
     "--interface-path",
     type=str,
     default=None,
-    help="Path for the connection: device path for USB/Bluetooth (e.g., /dev/ttyUSB0), or 'hostname:port' for host connections (e.g., 192.168.1.100:4403).",
+    help="Path for the connection: device path for USB (e.g., /dev/ttyUSB0), device name or MAC for Bluetooth (e.g., MESH_1111 or AA:BB:CC:DD:EE:FF), or 'hostname:port' for host connections (e.g., 192.168.1.100:4403).",
 )
 args = parser.parse_args()
 
