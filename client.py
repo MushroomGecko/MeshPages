@@ -8,7 +8,7 @@ from fastapi import FastAPI, Form, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from meshpages import MeshPageClient
+from meshpages import MeshPagesClient
 from meshpages.utils import parse_uri
 
 logging.basicConfig(level=logging.INFO)
@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
     """
     Manage app lifecycle: connect to mesh on startup, disconnect on shutdown.
 
-    Initializes the MeshPageClient and establishes the radio connection when the
+    Initializes the MeshPagesClient and establishes the radio connection when the
     app starts, then cleanly closes the connection when the app shuts down.
 
     Parameters:
@@ -95,7 +95,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"Connecting to radio with default {connection_type} interface...")
 
     # Initialize the mesh client and establish radio connection
-    meshpage = MeshPageClient(connection_type=connection_type, interface_path=interface_path)
+    meshpage = MeshPagesClient(connection_type=connection_type, interface_path=interface_path)
 
     # Yield control back to FastAPI; the server runs until shutdown
     yield

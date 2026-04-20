@@ -127,8 +127,8 @@ Understanding MeshPages' core components will help you use it effectively:
 
 #### Components
 
-- **MeshPageServer**: Core server API that handles incoming Meshtastic requests, routes, and responses
-- **MeshPageClient**: Client API for requesting pages from Meshtastic mesh nodes
+- **MeshPagesServer**: Core server API that handles incoming Meshtastic requests, routes, and responses
+- **MeshPagesClient**: Client API for requesting pages from Meshtastic mesh nodes
 - **AirTrafficControl**: Backoff algorithm for channel utilization management
 - **Packet Encoding/Decoding**: Multi-packet assembly and Brotli compression/decompression for Meshtastic transmission
 
@@ -220,31 +220,31 @@ Once running, open your browser and navigate to `http://127.0.0.1:8000` to:
 MeshPages uses a FastAPI-inspired decorator pattern for defining routes. Creating a new server is simple:
 
 ```python
-from meshpages import MeshPageServer
+from meshpages import MeshPagesServer
 
 # Create a server instance - USB connection (auto-detect)
-app = MeshPageServer(
+app = MeshPagesServer(
     timeout=60,
     courtousy_interval=2.5,
 )
 
 # Or specify connection explicitly:
 # USB with specific device
-# app = MeshPageServer(
+# app = MeshPagesServer(
 #     connection_type="usb",
 #     interface_path="/dev/ttyUSB0",
 #     timeout=60,
 # )
 
 # Bluetooth connection
-# app = MeshPageServer(
+# app = MeshPagesServer(
 #     connection_type="bluetooth",
 #     interface_path="MESH_1111",  # or "AA:BB:CC:DD:EE:FF"
 #     timeout=60,
 # )
 
 # Host (TCP/Network) connection
-# app = MeshPageServer(
+# app = MeshPagesServer(
 #     connection_type="host",
 #     interface_path="192.168.1.100:4403",
 #     timeout=60,
@@ -369,10 +369,10 @@ Protocol overhead added per packet (in bytes). Used for accurate airtime calcula
 ### Example: Custom Server Configuration
 
 ```python
-from meshpages import MeshPageServer, Config
+from meshpages import MeshPagesServer, Config
 from meshpages.channel_presets import ChannelPresets
 
-app = MeshPageServer(
+app = MeshPagesServer(
     connection_type="usb",
     interface_path="/dev/ttyUSB0",
     timeout=120,                                        # Wait up to 2 minutes for responses
