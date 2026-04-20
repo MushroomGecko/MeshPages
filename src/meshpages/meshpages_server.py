@@ -4,10 +4,13 @@ import os
 import time
 import threading
 from queue import Queue
-from typing import Callable, Iterator, Union
+from typing import Callable, Iterator, Literal, Union
 
 import meshtastic
+import meshtastic.ble_interface
 import meshtastic.serial_interface
+import meshtastic.stream_interface
+import meshtastic.tcp_interface
 import meshtastic.version
 import minify_html_onepass
 from pubsub import pub
@@ -15,7 +18,7 @@ from pubsub import pub
 from meshpages.air_traffic_control import AirTrafficControl
 from meshpages.channel_presets import ChannelPresets
 from meshpages.models import Config, ResponsePacket, User
-from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet
+from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet, parse_hostname
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -43,7 +46,7 @@ ROUTING_APP = "ROUTING_APP"
 INTENDED_RETURN_TYPES = ["html", "text"]
 
 
-class MeshPageServer:
+class MeshPagesServer:
     """
     Server for handling HTTP-like page requests from remote mesh nodes.
 
@@ -55,7 +58,8 @@ class MeshPageServer:
 
     def __init__(
         self,
-        usb_interface: str = None,
+        connection_type: Literal["usb", "bluetooth", "host"] = "usb",
+        interface_path: str = None,  # Path for connection: device path for USB (e.g. /dev/ttyUSB0), device name/MAC for Bluetooth (e.g. MESH_1111 or AA:BB:CC:DD:EE:FF), or "hostname:port" for host
         loop_interval: float = 1.0,  # in seconds
         timeout: int = 60,  # in seconds
         courtousy_interval: float = 2.5,  # in seconds
@@ -69,7 +73,11 @@ class MeshPageServer:
         Initialize the mesh page server and connect to the mesh network.
 
         Parameters:
-            usb_interface (str, optional): USB device path for the Meshtastic radio. Defaults to None (auto-detect).
+            connection_type (str): The type of connection to use ("usb", "bluetooth", "host"). Defaults to "usb".
+            interface_path (str, optional): The path to the interface to use. Defaults to None (auto-detect).
+                For USB: device path (e.g., '/dev/ttyUSB0')
+                For Bluetooth: device name (e.g., 'MESH_1111') or MAC address (e.g., 'AA:BB:CC:DD:EE:FF')
+                For host: "hostname:port" format (e.g., '192.168.1.100:4403')
             loop_interval (float): How often to process the user queue (seconds). Defaults to 1.0.
             timeout (int): Maximum time to wait before dropping a client request (seconds). Defaults to 60.
             courtousy_interval (float): Delay between sending consecutive chunks (seconds). Defaults to 0.3.
@@ -80,15 +88,30 @@ class MeshPageServer:
 
         Raises:
             ValueError: If no valid node ID is found on the connected Meshtastic device.
-            Exception: If connection to the Meshtastic serial interface fails.
+            Exception: If connection to the Meshtastic interface fails.
         """
         # Subscribe to the Meshtastic pubsub system to receive all incoming packets
         pub.subscribe(self._on_receive, "meshtastic.receive")
         self.node_info = None
 
         try:
-            # Connect to the Meshtastic radio via USB serial interface
-            self.interface = meshtastic.serial_interface.SerialInterface(usb_interface)
+            # Connect to the Meshtastic radio via the specified interface
+            if connection_type == "usb":
+                self.interface = meshtastic.serial_interface.SerialInterface(interface_path)
+            elif connection_type == "bluetooth":
+                self.interface = meshtastic.ble_interface.BLEInterface(interface_path)
+            elif connection_type == "host":
+                if not interface_path:
+                    raise ValueError("Host connection requires interface_path in format 'hostname:port' or 'hostname' (defaults to port 4403)")
+                hostname, port = parse_hostname(interface_path)
+                self.interface = meshtastic.tcp_interface.TCPInterface(hostname, portNumber=port)
+            else:
+                raise ValueError(
+                    f"Invalid connection configuration. Got connection_type={connection_type!r}, interface_path={interface_path!r}." "Expected one of: ",
+                    "(usb, str path like '/dev/ttyUSB0')",
+                    "(bluetooth, str name like 'MESH_1111' or MAC like 'AA:BB:CC:DD:EE:FF')",
+                    "(host, str like 'hostname:port' or 'hostname' for default port)",
+                )
 
             # Retrieve local device information from the connected radio
             self.node_info = self.interface.getMyNodeInfo()
@@ -102,7 +125,7 @@ class MeshPageServer:
                 raise ValueError("No node ID found")
             logger.info(f"Connected to Meshtastic node: {self.node_id}")
         except Exception as e:
-            logger.error(f"Failed to initialize Meshtastic interface (USB: {usb_interface}): {e}")
+            logger.error(f"Failed to initialize Meshtastic interface (type: {connection_type}, path: {interface_path}): {e}")
             raise
 
         # Dictionary mapping request paths to handler functions and their response types
@@ -405,7 +428,7 @@ class MeshPageServer:
     def _on_receive(
         self,
         packet,
-        interface: meshtastic.serial_interface.SerialInterface,
+        interface: meshtastic.stream_interface.StreamInterface,
     ) -> None:
         """
         Handle incoming requests from mesh clients.
@@ -416,7 +439,7 @@ class MeshPageServer:
 
         Parameters:
             packet (dict): The received Meshtastic packet containing decoded message data.
-            interface (meshtastic.serial_interface.SerialInterface): The radio interface reference.
+            interface (meshtastic.stream_interface.StreamInterface): The radio interface reference.
 
         Returns:
             None

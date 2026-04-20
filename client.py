@@ -8,7 +8,7 @@ from fastapi import FastAPI, Form, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from meshpages import MeshPageClient
+from meshpages import MeshPagesClient
 from meshpages.utils import parse_uri
 
 logging.basicConfig(level=logging.INFO)
@@ -17,10 +17,17 @@ logger = logging.getLogger(__name__)
 # Parse CLI arguments at module load time (before FastAPI app initialization)
 parser = argparse.ArgumentParser(description="MeshPages client: request web pages from mesh network nodes")
 parser.add_argument(
-    "--usb-interface",
+    "--interface-type",
+    type=str,
+    choices=["usb", "bluetooth", "host"],
+    default="usb",
+    help="Connection type for the radio (usb, bluetooth, or host). Defaults to usb.",
+)
+parser.add_argument(
+    "--interface-path",
     type=str,
     default=None,
-    help="USB interface for the radio connection (e.g., /dev/ttyUSB0). If not specified, uses default.",
+    help="Path for the connection: device path for USB (e.g., /dev/ttyUSB0), device name or MAC for Bluetooth (e.g., MESH_1111 or AA:BB:CC:DD:EE:FF), or 'hostname:port' for host connections (e.g., 192.168.1.100:4403).",
 )
 args = parser.parse_args()
 
@@ -67,7 +74,7 @@ async def lifespan(app: FastAPI):
     """
     Manage app lifecycle: connect to mesh on startup, disconnect on shutdown.
 
-    Initializes the MeshPageClient and establishes the radio connection when the
+    Initializes the MeshPagesClient and establishes the radio connection when the
     app starts, then cleanly closes the connection when the app shuts down.
 
     Parameters:
@@ -78,17 +85,17 @@ async def lifespan(app: FastAPI):
     """
     global meshpage
 
-    # Use usb_interface from module-level args (parsed at module load time)
-    usb_interface = None if not args.usb_interface else args.usb_interface
+    connection_type = args.interface_type
+    interface_path = args.interface_path
 
     # Log connection attempt with appropriate message
-    if usb_interface:
-        logger.info(f"Connecting to radio on {usb_interface}...")
+    if interface_path:
+        logger.info(f"Connecting to radio on {connection_type} interface: {interface_path}...")
     else:
-        logger.info("Connecting to radio with default interface...")
+        logger.info(f"Connecting to radio with default {connection_type} interface...")
 
     # Initialize the mesh client and establish radio connection
-    meshpage = MeshPageClient(usb_interface=usb_interface)
+    meshpage = MeshPagesClient(connection_type=connection_type, interface_path=interface_path)
 
     # Yield control back to FastAPI; the server runs until shutdown
     yield
