@@ -1,6 +1,6 @@
 import brotli
 import meshtastic
-import meshtastic.serial_interface
+import meshtastic.stream_interface
 
 from meshpages.models import ResponsePacket
 
@@ -31,6 +31,35 @@ def parse_uri(uri: str) -> tuple[str, str]:
     else:
         # Invalid URI format - return None tuple to indicate parsing failure
         return (None, None)
+
+
+def parse_hostname(hostname: str) -> tuple[str, int]:
+    """
+    Parse a hostname string into a tuple of (hostname, port).
+
+    Parses "hostname:port" format. If no port is specified, defaults to 4403 (Meshtastic TCP default).
+
+    Parameters:
+        hostname (str): Hostname string in format "hostname:port" or just "hostname".
+
+    Returns:
+        tuple[str, int]: A tuple containing (hostname, port).
+
+    Raises:
+        ValueError: If the port is not a valid integer.
+    """
+    if ":" in hostname:
+        parts = hostname.split(":")
+        if len(parts) != 2:
+            raise ValueError(f"Invalid hostname format: {hostname}. Expected 'hostname:port' or 'hostname'")
+        try:
+            port = int(parts[1].strip())
+            return (parts[0].strip(), port)
+        except ValueError as e:
+            raise ValueError(f"Invalid port in hostname: {parts[1]} is not a valid integer") from e
+    else:
+        # Default to Meshtastic TCP default port if not specified
+        return (hostname.strip(), 4403)
 
 
 def compress_payload(payload: str) -> bytes:
@@ -156,7 +185,7 @@ def decode_packet(payload: bytes) -> ResponsePacket:
         return None
 
 
-def get_node_db_info(interface: meshtastic.serial_interface.SerialInterface) -> dict:
+def get_node_db_info(interface: meshtastic.stream_interface.StreamInterface) -> dict:
     """
     Extract and format node information from the mesh network database.
 
@@ -165,7 +194,7 @@ def get_node_db_info(interface: meshtastic.serial_interface.SerialInterface) -> 
     of the local node for easier reference in display contexts.
 
     Parameters:
-        interface (meshtastic.serial_interface.SerialInterface): Connected interface to the Meshtastic radio.
+        interface (meshtastic.stream_interface.StreamInterface): Connected interface to the Meshtastic radio.
 
     Returns:
         dict: Dictionary keyed by node ID (int), each value contains:

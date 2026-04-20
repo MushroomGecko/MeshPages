@@ -1,13 +1,15 @@
 import logging
 import os
 import threading
+from typing import Literal
 
 import meshtastic
 import meshtastic.serial_interface
+import meshtastic.stream_interface
 from pubsub import pub
 
 from meshpages.models import ResponsePacket
-from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet, get_node_db_info
+from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet, get_node_db_info, parse_hostname
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -30,7 +32,7 @@ ROUTING_APP = "ROUTING_APP"
 INTENDED_RETURN_TYPES = ["html", "text"]
 
 
-class MeshPageClient:
+class MeshPagesClient:
     """
     Client for requesting web pages from nodes in a Meshtastic mesh network.
 
@@ -41,19 +43,23 @@ class MeshPageClient:
 
     def __init__(
         self,
-        usb_interface: str = None,
+        connection_type: Literal["usb", "bluetooth", "host"] = "usb",
+        interface_path: str = None,  # Path for connection: string for USB/Bluetooth (e.g. /dev/ttyUSB0, /dev/rfcomm0), or "hostname:port" for host
         timeout: int = 60,  # in seconds
     ):
         """
         Initialize the mesh page client and connect to the mesh network.
 
         Parameters:
-            usb_interface (str, optional): USB device path for the Meshtastic radio. Defaults to None (auto-detect).
+            connection_type (str): The type of connection to use ("usb", "bluetooth", "host"). Defaults to "usb".
+            interface_path (str, optional): The path to the interface to use. Defaults to None (auto-detect).
+                For USB/Bluetooth: device path (e.g., '/dev/ttyUSB0')
+                For host: "hostname:port" format (e.g., '192.168.1.100:4403')
             timeout (int): Maximum time in seconds to wait for a response from a remote node. Defaults to 60.
 
         Raises:
             ValueError: If no valid node ID is found on the connected Meshtastic device.
-            Exception: If connection to the Meshtastic serial interface fails.
+            Exception: If connection to the Meshtastic interface fails.
         """
         # Dictionary to buffer incoming packet chunks, keyed by chunk ID
         self.response_container: dict[int, bytes] = {}
@@ -73,8 +79,19 @@ class MeshPageClient:
         pub.subscribe(self._on_receive, "meshtastic.receive")
 
         try:
-            # Connect to the Meshtastic radio via USB serial interface
-            self.interface = meshtastic.serial_interface.SerialInterface(usb_interface)
+            # Connect to the Meshtastic radio via the specified interface
+            if connection_type == "usb":
+                self.interface = meshtastic.serial_interface.SerialInterface(interface_path)
+            elif connection_type == "bluetooth":
+                self.interface = meshtastic.bluetooth_interface.BluetoothInterface(interface_path)
+            elif connection_type == "host":
+                if not interface_path:
+                    raise ValueError("Host connection requires interface_path in format 'hostname:port' or 'hostname' (defaults to port 4403)")
+                hostname, port = parse_hostname(interface_path)
+                self.interface = meshtastic.tcp_interface.TCPInterface(hostname, portNumber=port)
+            else:
+                raise ValueError(f"Invalid connection configuration. Got connection_type={connection_type!r}, interface_path={interface_path!r}. " f"Expected one of: " f"(usb, str path like '/dev/ttyUSB0'), " f"(bluetooth, str path like '/dev/rfcomm0'), " f"(host, str like 'hostname:port' or 'hostname' for default port)")
+
             # Retrieve local device information from the connected radio
             user = self.interface.getMyNodeInfo().get("user", {})
             # Extract this node's unique identifier from device info
@@ -85,7 +102,7 @@ class MeshPageClient:
                 raise ValueError("No node ID found")
             logger.info(f"Connected to Meshtastic node: {self.node_id}")
         except Exception as e:
-            logger.error(f"Failed to initialize Meshtastic interface (USB: {usb_interface}): {e}")
+            logger.error(f"Failed to initialize Meshtastic interface (type: {connection_type}, path: {interface_path}): {e}")
             raise
 
     def _validate_target_node(
@@ -183,7 +200,7 @@ class MeshPageClient:
     def _on_receive(
         self,
         packet,
-        interface: meshtastic.serial_interface.SerialInterface,
+        interface: meshtastic.stream_interface.StreamInterface,
     ) -> None:
         """
         Handle incoming radio packets from the Meshtastic interface.
@@ -194,7 +211,7 @@ class MeshPageClient:
 
         Parameters:
             packet (dict): The received Meshtastic packet containing decoded data.
-            interface (meshtastic.serial_interface.SerialInterface): The radio interface reference.
+            interface (meshtastic.stream_interface.StreamInterface): The radio interface reference.
 
         Returns:
             None
