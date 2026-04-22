@@ -454,7 +454,7 @@ class MeshPagesServer:
                 # Defensive check: from_id should always be present, but handle gracefully if missing
                 logger.warning("Packet received without sender ID")
                 return
-            
+
             # Extract the receiver's node ID
             to_id = packet.get("toId", "")
             if to_id == "^all":
