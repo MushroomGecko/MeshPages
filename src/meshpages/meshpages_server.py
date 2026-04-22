@@ -62,7 +62,7 @@ class MeshPagesServer:
         interface_path: str = None,  # Path for connection: device path for USB (e.g. /dev/ttyUSB0), device name/MAC for Bluetooth (e.g. MESH_1111 or AA:BB:CC:DD:EE:FF), or "hostname:port" for host
         loop_interval: float = 1.0,  # in seconds
         timeout: int = 60,  # in seconds
-        courtousy_interval: float = 2.5,  # in seconds
+        courtousy_interval: float = 3.0,  # in seconds
         message_ack: str = True,  # True for TCP style, False for UDP style of message sending
         air_traffic_control_config: Union[Config, ChannelPresets] = ChannelPresets.LONG_FAST,  # in Config or ChannelPresets
         air_traffic_control_target_utilization_percent: float = 50.0,  # in percent
