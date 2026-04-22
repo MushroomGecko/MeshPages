@@ -236,9 +236,9 @@ class MeshPagesClient:
         try:
             decoded_message = packet.get("decoded", {})
             portnum = decoded_message.get("portnum", "")
+
             # Extract the receiver's node ID
             to_id = packet.get("toId", "")
-
             if to_id == "^all":
                 # Precautionary check: Ignore public channel messages. The client only expects direct
                 # responses from the target server node. If messages somehow arrive via ^all, ignore them.
