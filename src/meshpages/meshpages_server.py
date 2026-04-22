@@ -452,7 +452,15 @@ class MeshPagesServer:
             from_id = packet.get("fromId", "")
             if not from_id:
                 # Defensive check: from_id should always be present, but handle gracefully if missing
-                logger.warning("No from ID found in packet")
+                logger.warning("Packet received without sender ID")
+                return
+            
+            # Extract the receiver's node ID
+            to_id = packet.get("toId", "")
+            if to_id == "^all":
+                # Ignore public channel messages (^all). We only process direct/private messages
+                # to prevent channel saturation and avoid responding to normal conversations
+                logger.warning("Ignoring public channel message")
                 return
 
             # Perform the retry logic for the current client if needed
