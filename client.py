@@ -95,7 +95,11 @@ async def lifespan(app: FastAPI):
         logger.info(f"Connecting to radio with default {connection_type} interface...")
 
     # Initialize the mesh client and establish radio connection
-    meshpage = MeshPagesClient(connection_type=connection_type, interface_path=interface_path)
+    meshpage = MeshPagesClient(
+        connection_type=connection_type,
+        interface_path=interface_path,
+        timeout=300,
+    )
 
     # Yield control back to FastAPI; the server runs until shutdown
     yield

@@ -42,19 +42,19 @@ git clone https://github.com/MushroomGecko/MeshPages.git
 cd MeshPages
 ```
 
-1. Create a virtual environment:
+2. Create a virtual environment:
 
 ```bash
 python3 -m venv .venv
 ```
 
-1. Activate the virtual environment:
+3. Activate the virtual environment:
 
 ```bash
 source .venv/bin/activate
 ```
 
-1. Install dependencies and MeshPages in editable mode:
+4. Install dependencies and MeshPages in editable mode:
 
 ```bash
 pip install -e .
@@ -72,19 +72,19 @@ git clone https://github.com/MushroomGecko/MeshPages.git
 cd MeshPages
 ```
 
-1. Create a virtual environment:
+2. Create a virtual environment:
 
 ```bash
 python3 -m venv .venv
 ```
 
-1. Activate the virtual environment:
+3. Activate the virtual environment:
 
 ```bash
 source .venv/bin/activate
 ```
 
-1. Install the package:
+4. Install the package:
 
 ```bash
 pip install .
@@ -224,8 +224,8 @@ from meshpages import MeshPagesServer
 
 # Create a server instance - USB connection (auto-detect)
 app = MeshPagesServer(
-    timeout=60,
-    courtousy_interval=2.5,
+    timeout=300,
+    courtousy_interval=3,
 )
 
 # Or specify connection explicitly:
@@ -233,21 +233,21 @@ app = MeshPagesServer(
 # app = MeshPagesServer(
 #     connection_type="usb",
 #     interface_path="/dev/ttyUSB0",
-#     timeout=60,
+#     timeout=300,
 # )
 
 # Bluetooth connection
 # app = MeshPagesServer(
 #     connection_type="bluetooth",
 #     interface_path="MESH_1111",  # or "AA:BB:CC:DD:EE:FF"
-#     timeout=60,
+#     timeout=300,
 # )
 
 # Host (TCP/Network) connection
 # app = MeshPagesServer(
 #     connection_type="host",
 #     interface_path="192.168.1.100:4403",
-#     timeout=60,
+#     timeout=300,
 # )
 
 # Define routes using decorators
@@ -308,11 +308,11 @@ For USB connections, `None` will auto-detect the first available device.
 
 ### Basic Options
 
-#### `timeout` (int, default: 60)
+#### `timeout` (int, default: 300)
 
 Maximum time in seconds to wait for a response from a remote node before timing out.
 
-#### `courtousy_interval` (float, default: 2.5)
+#### `courtousy_interval` (float, default: 3.0)
 
 Delay in seconds between sending consecutive response chunks. This gives receiving Meshtastic apps time to process incoming data. Increase this value if you experience packet loss on slower devices.
 
@@ -375,8 +375,8 @@ from meshpages.channel_presets import ChannelPresets
 app = MeshPagesServer(
     connection_type="usb",
     interface_path="/dev/ttyUSB0",
-    timeout=120,                                        # Wait up to 2 minutes for responses
-    courtousy_interval=1.0,                           # Fast chunk transmission
+    timeout=300,                                        # Wait up to 5 minutes for responses
+    courtousy_interval=3.0,                             # Measured chunk transmission interval
     loop_interval=0.5,                                # Check queue frequently
     message_ack=True,                                 # Reliable delivery
     air_traffic_control_config=ChannelPresets.LONG_MODERATE,  # Long range, moderate speed
@@ -479,7 +479,7 @@ sudo ./.venv/bin/python client.py --interface-type host --interface-path 192.168
 
 **Solutions**:
 
-- Increase `timeout` parameter (default: 60 seconds)
+- Increase `timeout` parameter (default: 300 seconds)
 - Reduce `courtousy_interval` to speed up transmission
 - Check mesh connectivity with Meshtastic firmware apps
 - Verify target node is powered and in range
@@ -541,7 +541,7 @@ MeshPages uses four log levels to organize information:
 ### Example Debug Output
 
 ```
-2026-04-18 14:32:45,123 - meshpages.meshpages_server - DEBUG - Server initialized with loop_interval=1.0s, timeout=60s, courtesy_interval=2.5s
+2026-04-18 14:32:45,123 - meshpages.meshpages_server - DEBUG - Server initialized with loop_interval=1.0s, timeout=300s, courtesy_interval=3.0s
 2026-04-18 14:32:45,124 - meshpages.meshpages_server - DEBUG - Registering route: /home (returns html)
 2026-04-18 14:32:46,456 - meshpages.meshpages_server - DEBUG - Received request from !abc123: type=html, route=<recognized>
 2026-04-18 14:32:46,457 - meshpages.meshpages_server - DEBUG - Successfully decoded HTML request from !abc123

@@ -47,7 +47,7 @@ class MeshPagesClient:
         self,
         connection_type: Literal["usb", "bluetooth", "host"] = "usb",
         interface_path: str = None,  # Path for connection: device path for USB (e.g. /dev/ttyUSB0), device name/MAC for Bluetooth (e.g. MESH_1111 or AA:BB:CC:DD:EE:FF), or "hostname:port" for host
-        timeout: int = 60,  # in seconds
+        timeout: int = 300,  # in seconds
     ):
         """
         Initialize the mesh page client and connect to the mesh network.
@@ -58,7 +58,7 @@ class MeshPagesClient:
                 For USB: device path (e.g., '/dev/ttyUSB0')
                 For Bluetooth: device name (e.g., 'MESH_1111') or MAC address (e.g., 'AA:BB:CC:DD:EE:FF')
                 For host: "hostname:port" format (e.g., '192.168.1.100:4403')
-            timeout (int): Maximum time in seconds to wait for a response from a remote node. Defaults to 60.
+            timeout (int): Maximum time in seconds to wait for a response from a remote node. Defaults to 300.
 
         Raises:
             ValueError: If no valid node ID is found on the connected Meshtastic device.
@@ -236,9 +236,18 @@ class MeshPagesClient:
         try:
             decoded_message = packet.get("decoded", {})
             portnum = decoded_message.get("portnum", "")
-            from_id = packet.get("fromId", "")
 
-            if portnum == PRIVATE_APP and from_id == self.target_node:
+            # Extract the receiver's node ID
+            to_id = packet.get("toId", "")
+            if to_id != self.node_id:
+                # Ignore messages not addressed to this node. The client only processes direct messages
+                # intended for it. This filters out public channel messages (^all) and messages to other nodes.
+                logger.warning(f"Ignoring message addressed to {to_id}, not our node {self.node_id}")
+                return
+
+            # Extract the sender's node ID
+            from_id = packet.get("fromId", "")
+            if portnum == PRIVATE_APP and from_id == self.target_node and to_id == self.node_id:
                 # Decode the binary packet into a ResponsePacket structure
                 response_packet = decode_packet(decoded_message.get("payload", b""))
                 logger.debug(f"Received PRIVATE_APP chunk from {from_id}: chunk {response_packet.current_chunk_id if response_packet else '?'}/{response_packet.total_chunks if response_packet else '?'}")
@@ -294,15 +303,20 @@ class MeshPagesClient:
                         logger.error("No expected total chunks set")
                     logger.error(f"Unexpected response state from {from_id}: packet={response_packet}, expected_total={self.expected_total_chunks}")
                     return
-
-            elif portnum == TEXT_MESSAGE_APP and from_id == self.target_node:
+            elif portnum == TEXT_MESSAGE_APP and from_id == self.target_node and to_id == self.node_id:
                 # TEXT_MESSAGE_APP responses are plain text error messages (not multi-chunk)
                 message = decoded_message.get("text", "")
                 logger.debug(f"Received TEXT_MESSAGE_APP from {from_id}")
                 self._handle_error_response(message if message else None)
-            elif from_id == self.target_node:
+                return
+            elif from_id == self.target_node and to_id == self.node_id:
                 # Message from target but wrong portnum
                 logger.debug(f"Received message from target {from_id} with unexpected portnum: {portnum}")
+                return
+            else:
+                # Message addressed to this node but from unexpected source or invalid combination
+                logger.debug(f"Ignoring unexpected message from {from_id} to {to_id} with portnum {portnum}")
+                return
         except Exception as e:
             logger.error(f"Error processing received message from {packet.get('fromId', 'Unknown')}: {e}")
             self._handle_error_response(None)

@@ -61,8 +61,8 @@ class MeshPagesServer:
         connection_type: Literal["usb", "bluetooth", "host"] = "usb",
         interface_path: str = None,  # Path for connection: device path for USB (e.g. /dev/ttyUSB0), device name/MAC for Bluetooth (e.g. MESH_1111 or AA:BB:CC:DD:EE:FF), or "hostname:port" for host
         loop_interval: float = 1.0,  # in seconds
-        timeout: int = 60,  # in seconds
-        courtousy_interval: float = 2.5,  # in seconds
+        timeout: int = 300,  # in seconds
+        courtousy_interval: float = 3.0,  # in seconds
         message_ack: str = True,  # True for TCP style, False for UDP style of message sending
         air_traffic_control_config: Union[Config, ChannelPresets] = ChannelPresets.LONG_FAST,  # in Config or ChannelPresets
         air_traffic_control_target_utilization_percent: float = 50.0,  # in percent
@@ -79,8 +79,8 @@ class MeshPagesServer:
                 For Bluetooth: device name (e.g., 'MESH_1111') or MAC address (e.g., 'AA:BB:CC:DD:EE:FF')
                 For host: "hostname:port" format (e.g., '192.168.1.100:4403')
             loop_interval (float): How often to process the user queue (seconds). Defaults to 1.0.
-            timeout (int): Maximum time to wait before dropping a client request (seconds). Defaults to 60.
-            courtousy_interval (float): Delay between sending consecutive chunks (seconds). Defaults to 0.3.
+            timeout (int): Maximum time to wait before dropping a client request (seconds). Defaults to 300.
+            courtousy_interval (float): Delay between sending consecutive chunks (seconds). Defaults to 3.0.
             air_traffic_control_config (Union[Config, ChannelPresets]): LoRa radio configuration. Defaults to LONG_FAST preset.
             air_traffic_control_target_utilization_percent (float): Target channel utilization (0-100). Defaults to 50%.
             air_traffic_control_window_seconds (float): Time window for utilization calculation (seconds). Defaults to 10.0.
@@ -452,7 +452,15 @@ class MeshPagesServer:
             from_id = packet.get("fromId", "")
             if not from_id:
                 # Defensive check: from_id should always be present, but handle gracefully if missing
-                logger.warning("No from ID found in packet")
+                logger.warning("Packet received without sender ID")
+                return
+
+            # Extract the receiver's node ID
+            to_id = packet.get("toId", "")
+            if to_id == "^all":
+                # Ignore public channel messages (^all). We only process direct/private messages
+                # to prevent channel saturation and avoid responding to normal conversations
+                logger.warning("Ignoring public channel message")
                 return
 
             # Perform the retry logic for the current client if needed
