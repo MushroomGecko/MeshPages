@@ -47,7 +47,7 @@ class MeshPagesClient:
         self,
         connection_type: Literal["usb", "bluetooth", "host"] = "usb",
         interface_path: str = None,  # Path for connection: device path for USB (e.g. /dev/ttyUSB0), device name/MAC for Bluetooth (e.g. MESH_1111 or AA:BB:CC:DD:EE:FF), or "hostname:port" for host
-        timeout: int = 60,  # in seconds
+        timeout: int = 300,  # in seconds
     ):
         """
         Initialize the mesh page client and connect to the mesh network.

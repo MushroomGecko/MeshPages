@@ -61,7 +61,7 @@ class MeshPagesServer:
         connection_type: Literal["usb", "bluetooth", "host"] = "usb",
         interface_path: str = None,  # Path for connection: device path for USB (e.g. /dev/ttyUSB0), device name/MAC for Bluetooth (e.g. MESH_1111 or AA:BB:CC:DD:EE:FF), or "hostname:port" for host
         loop_interval: float = 1.0,  # in seconds
-        timeout: int = 60,  # in seconds
+        timeout: int = 300,  # in seconds
         courtousy_interval: float = 3.0,  # in seconds
         message_ack: str = True,  # True for TCP style, False for UDP style of message sending
         air_traffic_control_config: Union[Config, ChannelPresets] = ChannelPresets.LONG_FAST,  # in Config or ChannelPresets
@@ -79,7 +79,7 @@ class MeshPagesServer:
                 For Bluetooth: device name (e.g., 'MESH_1111') or MAC address (e.g., 'AA:BB:CC:DD:EE:FF')
                 For host: "hostname:port" format (e.g., '192.168.1.100:4403')
             loop_interval (float): How often to process the user queue (seconds). Defaults to 1.0.
-            timeout (int): Maximum time to wait before dropping a client request (seconds). Defaults to 60.
+            timeout (int): Maximum time to wait before dropping a client request (seconds). Defaults to 300.
             courtousy_interval (float): Delay between sending consecutive chunks (seconds). Defaults to 0.3.
             air_traffic_control_config (Union[Config, ChannelPresets]): LoRa radio configuration. Defaults to LONG_FAST preset.
             air_traffic_control_target_utilization_percent (float): Target channel utilization (0-100). Defaults to 50%.
