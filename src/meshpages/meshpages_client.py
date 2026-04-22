@@ -236,9 +236,19 @@ class MeshPagesClient:
         try:
             decoded_message = packet.get("decoded", {})
             portnum = decoded_message.get("portnum", "")
-            from_id = packet.get("fromId", "")
+            # Extract the receiver's node ID
+            to_id = packet.get("toId", "")
 
-            if portnum == PRIVATE_APP and from_id == self.target_node:
+            if to_id == "^all":
+                # Precautionary check: Ignore public channel messages. The client only expects direct
+                # responses from the target server node. If messages somehow arrive via ^all, ignore them.
+                # This shouldn't happen with a proper MeshPages server, but we filter just in case.
+                logger.warning("Ignoring public channel message")
+                return
+
+            # Extract the sender's node ID
+            from_id = packet.get("fromId", "")
+            if portnum == PRIVATE_APP and from_id == self.target_node and to_id == self.node_id:
                 # Decode the binary packet into a ResponsePacket structure
                 response_packet = decode_packet(decoded_message.get("payload", b""))
                 logger.debug(f"Received PRIVATE_APP chunk from {from_id}: chunk {response_packet.current_chunk_id if response_packet else '?'}/{response_packet.total_chunks if response_packet else '?'}")
@@ -295,12 +305,12 @@ class MeshPagesClient:
                     logger.error(f"Unexpected response state from {from_id}: packet={response_packet}, expected_total={self.expected_total_chunks}")
                     return
 
-            elif portnum == TEXT_MESSAGE_APP and from_id == self.target_node:
+            elif portnum == TEXT_MESSAGE_APP and from_id == self.target_node and to_id == self.node_id:
                 # TEXT_MESSAGE_APP responses are plain text error messages (not multi-chunk)
                 message = decoded_message.get("text", "")
                 logger.debug(f"Received TEXT_MESSAGE_APP from {from_id}")
                 self._handle_error_response(message if message else None)
-            elif from_id == self.target_node:
+            elif from_id == self.target_node and to_id == self.node_id:
                 # Message from target but wrong portnum
                 logger.debug(f"Received message from target {from_id} with unexpected portnum: {portnum}")
         except Exception as e:
