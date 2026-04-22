@@ -80,7 +80,7 @@ class MeshPagesServer:
                 For host: "hostname:port" format (e.g., '192.168.1.100:4403')
             loop_interval (float): How often to process the user queue (seconds). Defaults to 1.0.
             timeout (int): Maximum time to wait before dropping a client request (seconds). Defaults to 300.
-            courtousy_interval (float): Delay between sending consecutive chunks (seconds). Defaults to 0.3.
+            courtousy_interval (float): Delay between sending consecutive chunks (seconds). Defaults to 3.0.
             air_traffic_control_config (Union[Config, ChannelPresets]): LoRa radio configuration. Defaults to LONG_FAST preset.
             air_traffic_control_target_utilization_percent (float): Target channel utilization (0-100). Defaults to 50%.
             air_traffic_control_window_seconds (float): Time window for utilization calculation (seconds). Defaults to 10.0.

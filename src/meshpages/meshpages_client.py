@@ -58,7 +58,7 @@ class MeshPagesClient:
                 For USB: device path (e.g., '/dev/ttyUSB0')
                 For Bluetooth: device name (e.g., 'MESH_1111') or MAC address (e.g., 'AA:BB:CC:DD:EE:FF')
                 For host: "hostname:port" format (e.g., '192.168.1.100:4403')
-            timeout (int): Maximum time in seconds to wait for a response from a remote node. Defaults to 60.
+            timeout (int): Maximum time in seconds to wait for a response from a remote node. Defaults to 300.
 
         Raises:
             ValueError: If no valid node ID is found on the connected Meshtastic device.
