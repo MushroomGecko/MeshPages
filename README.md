@@ -42,19 +42,19 @@ git clone https://github.com/MushroomGecko/MeshPages.git
 cd MeshPages
 ```
 
-1. Create a virtual environment:
+2. Create a virtual environment:
 
 ```bash
 python3 -m venv .venv
 ```
 
-1. Activate the virtual environment:
+3. Activate the virtual environment:
 
 ```bash
 source .venv/bin/activate
 ```
 
-1. Install dependencies and MeshPages in editable mode:
+4. Install dependencies and MeshPages in editable mode:
 
 ```bash
 pip install -e .
@@ -72,19 +72,19 @@ git clone https://github.com/MushroomGecko/MeshPages.git
 cd MeshPages
 ```
 
-1. Create a virtual environment:
+2. Create a virtual environment:
 
 ```bash
 python3 -m venv .venv
 ```
 
-1. Activate the virtual environment:
+3. Activate the virtual environment:
 
 ```bash
 source .venv/bin/activate
 ```
 
-1. Install the package:
+4. Install the package:
 
 ```bash
 pip install .
