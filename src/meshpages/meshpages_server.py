@@ -548,9 +548,23 @@ class MeshPagesServer:
 
             # Check if the message is a valid endpoint
             if text and text.split("?")[0] in self.routes:
-                # Get the path and parameters from the text
-                path = text.split("?")[0]
-                request_parameters = parse_parameters(text.split("?")[1])
+                # Split the request into path and query string components
+                split_text = text.split("?")
+                
+                # Extract the path (everything before the "?")
+                path = split_text[0]
+                
+                # Parse query parameters if they exist
+                # Check if there are query parameters (split_text has more than 1 element)
+                # AND that the query string is not empty/whitespace
+                if len(split_text) > 1 and split_text[1].strip():
+                    request_parameters = parse_parameters(split_text[1].strip())
+                else:
+                    # No query parameters provided: default to empty dictionary
+                    request_parameters = {}
+                
+                # Log the parsed parameters for debugging
+                logger.debug(f"Request parameters: {request_parameters}")
 
                 # Get the function, intended return type, and route parameters associated with the endpoint
                 func = self.routes[path]["func"]
