@@ -1,3 +1,4 @@
+import inspect
 import logging
 import math
 import os
@@ -18,7 +19,7 @@ from pubsub import pub
 from meshpages.air_traffic_control import AirTrafficControl
 from meshpages.channel_presets import ChannelPresets
 from meshpages.models import Config, ResponsePacket, User
-from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet, parse_hostname
+from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet, parse_hostname, parse_parameters
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -546,15 +547,20 @@ class MeshPagesServer:
             logger.debug(f"Received request from {from_id}: type={message_request_type}, route={'<recognized>' if text in self.routes else '<not found>'}")
 
             # Check if the message is a valid endpoint
-            if text and text in self.routes:
-                # Get the function and intended return type associated with the endpoint
-                func = self.routes[text]["func"]
-                intended_return_type = self.routes[text]["intended_return_type"]
+            if text and text.split("?")[0] in self.routes:
+                # Get the path and parameters from the text
+                path = text.split("?")[0]
+                request_parameters = parse_parameters(text.split("?")[1])
+
+                # Get the function, intended return type, and route parameters associated with the endpoint
+                func = self.routes[path]["func"]
+                intended_return_type = self.routes[path]["intended_return_type"]
+                route_parameters = self.routes[path]["parameters"]
 
                 # Validate that the client type matches the endpoint's expected type
                 # Send user-friendly error messages for common mismatches
                 if message_request_type == "text" and intended_return_type == "html":
-                    logger.info(f"Request mismatch from {from_id}: text client requesting HTML endpoint {text}")
+                    logger.info(f"Request mismatch from {from_id}: text client requesting HTML endpoint {path}")
                     self._throw_error_response(
                         from_id,
                         "This endpoint requires the MeshPages web client. Please use the web client instead of the Meshtastic app.",
@@ -562,7 +568,7 @@ class MeshPagesServer:
                     )
                     return
                 elif message_request_type == "html" and intended_return_type == "text":
-                    logger.info(f"Request mismatch from {from_id}: HTML client requesting text endpoint {text}")
+                    logger.info(f"Request mismatch from {from_id}: HTML client requesting text endpoint {path}")
                     self._throw_error_response(
                         from_id,
                         "This endpoint requires the Meshtastic app. Please use the Meshtastic app instead of the MeshPages web client.",
@@ -579,10 +585,34 @@ class MeshPagesServer:
                     )
                     return
 
-                # Call the function associated with the endpoint
-                result = func()
+                # Extract only the expected parameters from the incoming request
+                # This filters out any extra/unknown parameters and sets missing parameters to None
+                # allowing the endpoint handler to deal with missing values as needed
+                filtered_parameters = {}
+                for parameter in route_parameters:
+                    # Check if the parameter was provided in the request
+                    if parameter in request_parameters:
+                        # Parameter was provided: use the incoming value
+                        filtered_parameters[parameter] = request_parameters[parameter]
+                    else:
+                        # Parameter was not provided: set to None so the function gets all expected params
+                        filtered_parameters[parameter] = None
 
-                # Set the status code to 200
+                try:
+                    # Call the function associated with the endpoint with only expected parameters
+                    result = func(**filtered_parameters)
+                except Exception as e:
+                    # Log the full error details for debugging and diagnostics
+                    logger.error(f"Error calling function for {from_id} on {path}: {e}")
+                    # Send generic error message to client (don't expose internal error details for security)
+                    self._throw_error_response(
+                        from_id,
+                        "An error occurred processing your request. Please try again.",
+                        500,
+                    )
+                    return
+
+                # Set the status code to 200 on successful execution
                 status_code = 200
 
                 # Add the user to the user queue
@@ -682,20 +712,25 @@ class MeshPagesServer:
             ValueError: If intended_return_type is not "html" or "text".
         """
 
-        # Define the inner decorator function that performs the registration
-        def decorator(func: Callable):
-            logger.debug(f"Registering route: {path} (returns {intended_return_type})")
-            # Store the handler function and its response type in the routes dictionary
-            self.routes[path] = {
-                "func": func,
-                "intended_return_type": intended_return_type,
-            }
-            return func
-
         # Validate the response type before registering the handler
         if intended_return_type not in INTENDED_RETURN_TYPES:
             logger.error(f"Invalid intended return type: {intended_return_type}. Must be one of: {INTENDED_RETURN_TYPES}")
             raise ValueError(f"Invalid intended return type: {intended_return_type}. Must be one of: {INTENDED_RETURN_TYPES}")
+
+        # Define the inner decorator function that performs the registration
+        def decorator(func: Callable):
+            # Get the signature of the function
+            signature = inspect.signature(func)
+            # Get the parameters of the function
+            parameters = list(signature.parameters.keys())
+            logger.debug(f"Registering route: {path} (returns {intended_return_type}) with parameters: {parameters}")
+            # Store the handler function and its response type and parameters in the routes dictionary
+            self.routes[path] = {
+                "func": func,
+                "intended_return_type": intended_return_type,
+                "parameters": parameters,
+            }
+            return func
 
         logger.info(f"Route registered: {path} -> {intended_return_type}")
         return decorator

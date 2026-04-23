@@ -2,6 +2,7 @@ import brotli
 import meshtastic
 import meshtastic.ble_interface
 import meshtastic.stream_interface
+from urllib.parse import parse_qsl
 
 from meshpages.models import ResponsePacket
 
@@ -32,6 +33,32 @@ def parse_uri(uri: str) -> tuple[str, str]:
     else:
         # Invalid URI format - return None tuple to indicate parsing failure
         return (None, None)
+
+
+def parse_parameters(path_str: str) -> dict:
+    """
+    Parse a query string into a dictionary of parameters.
+
+    Extracts and decodes the query string portion (after '?') from a path
+    and converts it into a key-value dictionary. Handles URL decoding
+    automatically (e.g., '+' to space, '%XX' hex codes).
+
+    Parameters:
+        path_str (str): Path string in format '/path?key1=value1&key2=value2'.
+
+    Returns:
+        dict: Dictionary of parsed parameters, or empty dict if no query string found.
+    """
+    # Return empty dict if no query string present
+    if not path_str or "?" not in path_str:
+        return {}
+
+    # Extract query string portion (everything after the '?')
+    parameters_string = path_str.split("?")[1]
+
+    # parse_qsl automatically handles URL decoding and returns list of (key, value) tuples
+    # dict() converts tuples to dictionary
+    return dict(parse_qsl(parameters_string))
 
 
 def parse_hostname(hostname: str) -> tuple[str, int]:
