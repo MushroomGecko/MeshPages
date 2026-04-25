@@ -555,25 +555,20 @@ class MeshPagesServer:
                 logger.debug(f"Failed to decode as binary packet from {from_id} (expected for text requests): {type(e).__name__}")
                 message_request_type = "text"
 
-            logger.debug(f"Received request from {from_id}: type={message_request_type}, route={'<recognized>' if text in self.routes else '<not found>'}")
+            # Parse the incoming request into path and query parameters
+            # Split on "?" to separate the endpoint path from query string
+            query_string = text.strip().split("?")
+            # Extract the path (everything before the "?")
+            path = query_string[0].strip()
+            # Extract and parse query parameters if they exist
+            # If no query string present or it's empty/whitespace, default to empty dict
+            request_parameters = parse_parameters(query_string[1].strip()) if len(query_string) > 1 and query_string[1].strip() else {}
+
+            logger.debug(f"Query string split: path='{path}', has_query={len(query_string) > 1}, request_parameters={request_parameters}")
+            logger.debug(f"Received request from {from_id}: type={message_request_type}, route={'<recognized>' if path in self.routes else '<not found>'}")
 
             # Check if the message is a valid endpoint
-            if text and text.split("?")[0] in self.routes:
-                # Split the request into path and query string components
-                split_text = text.split("?")
-
-                # Extract the path (everything before the "?")
-                path = split_text[0]
-
-                # Parse query parameters if they exist
-                # Check if there are query parameters (split_text has more than 1 element)
-                # AND that the query string is not empty/whitespace
-                if len(split_text) > 1 and split_text[1].strip():
-                    request_parameters = parse_parameters(split_text[1].strip())
-                else:
-                    # No query parameters provided: default to empty dictionary
-                    request_parameters = {}
-
+            if path and path in self.routes:
                 # Log the parsed parameters for debugging
                 logger.debug(f"Request parameters: {request_parameters}")
 
