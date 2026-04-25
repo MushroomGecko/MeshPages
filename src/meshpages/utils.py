@@ -1,10 +1,15 @@
 import brotli
+from urllib.parse import parse_qsl
+
 import meshtastic
 import meshtastic.ble_interface
 import meshtastic.stream_interface
-from urllib.parse import parse_qsl
 
+from meshpages.enums import StatusCodes
 from meshpages.models import ResponsePacket
+
+# Status codes that support chunked/multi-packet responses
+CHUNKABLE_STATUS_CODES = [StatusCodes.SUCCESS, StatusCodes.NOT_FOUND]
 
 
 def parse_uri(uri: str) -> tuple[str, str]:

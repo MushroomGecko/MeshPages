@@ -2,8 +2,8 @@ import inspect
 import logging
 import math
 import os
-import time
 import threading
+import time
 from queue import Queue
 from typing import Callable, Iterator, Literal, Union
 
@@ -17,9 +17,17 @@ import minify_html_onepass
 from pubsub import pub
 
 from meshpages.air_traffic_control import AirTrafficControl
-from meshpages.channel_presets import ChannelPresets
+from meshpages.enums import ChannelPresets, StatusCodes
 from meshpages.models import Config, ResponsePacket, User
-from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet, parse_hostname, parse_parameters
+from meshpages.utils import (
+    CHUNKABLE_STATUS_CODES,
+    compress_payload,
+    decode_packet,
+    decompress_payload,
+    encode_packet,
+    parse_hostname,
+    parse_parameters,
+)
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -196,7 +204,7 @@ class MeshPagesServer:
     def _get_chunks(
         self,
         payload: str | bytes,
-        status_code: int = 200,
+        status_code: int = StatusCodes.SUCCESS,
     ) -> Iterator[ResponsePacket]:
         """
         Chunk a payload into transmission-sized packets.
@@ -207,7 +215,7 @@ class MeshPagesServer:
 
         Parameters:
             payload (str | bytes): The response payload to chunk (HTML, text, or compressed bytes).
-            status_code (int): HTTP status code (200 for success, other values for errors). Defaults to 200.
+            status_code (int): HTTP status code (SUCCESS for success, other values for errors). Defaults to SUCCESS.
 
         Yields:
             ResponsePacket: Response packets ready for transmission, one chunk per iteration.
@@ -220,7 +228,7 @@ class MeshPagesServer:
         logger.debug(f"Calculating chunks: payload_length={payload_length}, buffer_offset={BUFFER_OFFSET}")
 
         # Error responses are always sent as single chunk (not split across multiple packets)
-        if status_code != 200:
+        if status_code not in CHUNKABLE_STATUS_CODES:
             if isinstance(payload, str):
                 raw = payload.encode("utf-8")
                 as_str = True
@@ -251,7 +259,7 @@ class MeshPagesServer:
         if total_chunks > 255:
             logger.error(f"Payload too large: requires {total_chunks} chunks, max is 255. Sending error response.")
             total_chunks = 1
-            status_code = 500
+            status_code = StatusCodes.INTERNAL_SERVER_ERROR
             payload = "Too many chunks to send. Please try again later.".encode("utf-8")
 
         logger.debug(f"Total chunks: {total_chunks}")
@@ -342,7 +350,7 @@ class MeshPagesServer:
                 self.air_traffic_control.add_packet_sent(len(chunk))
 
                 # Stop sending further chunks if error status (error responses are single-chunk only)
-                if status_code != 200:
+                if status_code not in CHUNKABLE_STATUS_CODES:
                     return
 
                 # Courtesy delay between chunks to give receiver time to process
@@ -391,7 +399,7 @@ class MeshPagesServer:
                 logger.debug(f"Text response chunk recorded for air traffic control ({len(response_packet.content)} bytes)")
 
                 # Stop sending further chunks if error status (error responses are single-chunk only)
-                if status_code != 200:
+                if status_code not in CHUNKABLE_STATUS_CODES:
                     return
 
                 # Courtesy delay between chunks to give receiver time to process
@@ -400,17 +408,20 @@ class MeshPagesServer:
             logger.error(f"Invalid response type: {response_type}. Must be one of: {INTENDED_RETURN_TYPES}")
             raise ValueError(f"Invalid response type: {response_type}. Must be one of: {INTENDED_RETURN_TYPES}")
 
-    def _throw_error_response(self, from_id: str, error_message: str, status_code: int) -> None:
+    def _throw_error_response(self, from_id: str, error_message: str, status_code: int, intended_return_type: str = "text") -> None:
         """
         Queue an error response to be sent back to a client.
 
         Creates a User object with error details and queues it for transmission.
-        Error responses are always sent as plain text type.
+        Error responses are typically sent as plain text, but may be HTML when the
+        error message requires formatted content for complete client-side rendering
+        (e.g., route listings, detailed error pages).
 
         Parameters:
             from_id (str): The client's node ID to send the error to.
             error_message (str): The error message content to send.
             status_code (int): HTTP status code (e.g., 400, 404, 500).
+            intended_return_type (str): Response format - "text" or "html". Defaults to "text".
 
         Returns:
             None
@@ -420,7 +431,7 @@ class MeshPagesServer:
             User(
                 from_id=from_id,
                 result=error_message,
-                intended_return_type="text",
+                intended_return_type=intended_return_type,
                 status_code=status_code,
                 time_received=time.time(),
             )
@@ -550,10 +561,10 @@ class MeshPagesServer:
             if text and text.split("?")[0] in self.routes:
                 # Split the request into path and query string components
                 split_text = text.split("?")
-                
+
                 # Extract the path (everything before the "?")
                 path = split_text[0]
-                
+
                 # Parse query parameters if they exist
                 # Check if there are query parameters (split_text has more than 1 element)
                 # AND that the query string is not empty/whitespace
@@ -562,7 +573,7 @@ class MeshPagesServer:
                 else:
                     # No query parameters provided: default to empty dictionary
                     request_parameters = {}
-                
+
                 # Log the parsed parameters for debugging
                 logger.debug(f"Request parameters: {request_parameters}")
 
@@ -578,7 +589,7 @@ class MeshPagesServer:
                     self._throw_error_response(
                         from_id,
                         "This endpoint requires the MeshPages web client. Please use the web client instead of the Meshtastic app.",
-                        400,
+                        StatusCodes.BAD_REQUEST,
                     )
                     return
                 elif message_request_type == "html" and intended_return_type == "text":
@@ -586,7 +597,7 @@ class MeshPagesServer:
                     self._throw_error_response(
                         from_id,
                         "This endpoint requires the Meshtastic app. Please use the Meshtastic app instead of the MeshPages web client.",
-                        400,
+                        StatusCodes.BAD_REQUEST,
                     )
                     return
                 # Catch unexpected request types (edge case: malformed or hacked requests)
@@ -595,7 +606,7 @@ class MeshPagesServer:
                     self._throw_error_response(
                         from_id,
                         f"Message request type {message_request_type} does not match intended return type {intended_return_type}",
-                        400,
+                        StatusCodes.BAD_REQUEST,
                     )
                     return
 
@@ -622,12 +633,12 @@ class MeshPagesServer:
                     self._throw_error_response(
                         from_id,
                         "An error occurred processing your request. Please try again.",
-                        500,
+                        StatusCodes.INTERNAL_SERVER_ERROR,
                     )
                     return
 
                 # Set the status code to 200 on successful execution
-                status_code = 200
+                status_code = StatusCodes.SUCCESS
 
                 # Add the user to the user queue
                 self.user_queue.put(
@@ -660,10 +671,13 @@ class MeshPagesServer:
                 html_routes_str = "\n".join(html_routes)
 
                 # Return a 404 error with helpful suggestions about available routes (text routes for Meshtastic App, html routes for MeshPages Web Client)
+                route_error_message = f"Invalid. Choose from the following routes:\nMeshtastic App:\n{text_routes_str}\nMeshPages Web Client:\n{html_routes_str}"
+                route_error_message = f"<pre style='color: orange; white-space: pre-wrap; word-wrap: break-word; font-family: monospace;'>{route_error_message}</pre>" if message_request_type == "html" else route_error_message
                 self._throw_error_response(
                     from_id,
-                    f"Invalid. Choose from the following routes:\nMeshtastic App:\n{text_routes_str}\nMeshPages Web Client:\n{html_routes_str}",
-                    404,
+                    route_error_message,
+                    StatusCodes.NOT_FOUND,
+                    message_request_type,
                 )
 
                 return

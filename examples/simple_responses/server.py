@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from meshpages import MeshPagesServer
-from meshpages.channel_presets import ChannelPresets
+from meshpages.enums import ChannelPresets
 
 # Get the directory where this script is located
 script_dir = Path(__file__).parent
