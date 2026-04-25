@@ -742,6 +742,10 @@ class MeshPagesServer:
 
         # Define the inner decorator function that performs the registration
         def decorator(func: Callable):
+            # Check if this endpoint is already registered
+            if path in self.routes:
+                raise ValueError(f"Endpoint '{path}' is already registered with return type '{self.routes[path]['intended_return_type']}'. Cannot register the same endpoint twice, even with different return types.")
+
             # Get the signature of the function
             signature = inspect.signature(func)
             # Get the parameters of the function
