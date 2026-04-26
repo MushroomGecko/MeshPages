@@ -19,6 +19,7 @@ from pubsub import pub
 from meshpages.air_traffic_control import AirTrafficControl
 from meshpages.enums import ChannelPresets, StatusCodes
 from meshpages.models import Config, ResponsePacket, User
+from meshpages.types import MeshType
 from meshpages.utils import (
     CHUNKABLE_STATUS_CODES,
     compress_payload,
@@ -572,10 +573,11 @@ class MeshPagesServer:
                 # Log the parsed parameters for debugging
                 logger.debug(f"Request parameters: {request_parameters}")
 
-                # Get the function, intended return type, and route parameters associated with the endpoint
+                # Get the function, intended return type, route parameters, and parameter types associated with the endpoint
                 func = self.routes[path]["func"]
                 intended_return_type = self.routes[path]["intended_return_type"]
                 route_parameters = self.routes[path]["parameters"]
+                parameter_types = self.routes[path]["parameter_types"]
 
                 # Validate that the client type matches the endpoint's expected type
                 # Send user-friendly error messages for common mismatches
@@ -606,13 +608,19 @@ class MeshPagesServer:
                     return
 
                 # Extract only the expected parameters from the incoming request
-                # This filters out any extra/unknown parameters and sets missing parameters to None
-                # allowing the endpoint handler to deal with missing values as needed
+                # This filters out any extra/unknown parameters and sets missing parameters appropriately
                 filtered_parameters = {}
                 for parameter in route_parameters:
-                    # Check if the parameter was provided in the request
-                    if parameter in request_parameters:
-                        # Parameter was provided: use the incoming value
+                    # Get the parameter type from the parameter types dictionary
+                    parameter_type = parameter_types.get(parameter, str)
+
+                    # Check if this parameter type is a MeshType
+                    if isinstance(parameter_type, type) and issubclass(parameter_type, MeshType):
+                        # MeshType parameters are generated from the packet, not from request
+                        # Instantiate the MeshType and pass the instance
+                        filtered_parameters[parameter] = parameter_type(packet)
+                    elif parameter in request_parameters:
+                        # Parameter was provided in the request: use the incoming value
                         filtered_parameters[parameter] = request_parameters[parameter]
                     else:
                         # Parameter was not provided: set to None so the function gets all expected params
@@ -654,12 +662,43 @@ class MeshPagesServer:
                 text_routes = []
                 html_routes = []
 
-                # Categorize routes by their intended return type
+                # Categorize routes by their intended return type with parameter type hints
+                # Loop through all registered routes to format them with type information
                 for route in self.routes:
-                    if self.routes[route]["intended_return_type"] == "text":
-                        text_routes.append(route)
-                    elif self.routes[route]["intended_return_type"] == "html":
-                        html_routes.append(route)
+                    # Get the route metadata (function, return type, parameters, etc.)
+                    route_info = self.routes[route]
+                    parameters = route_info.get("parameters", [])
+                    parameter_types = route_info.get("parameter_types", {})
+
+                    # Build query string example with type hints for documentation
+                    if parameters:
+                        query_parameters = []
+                        # Build each parameter example showing its type (e.g., username=<str>)
+                        for parameter in parameters:
+                            # If the parameter is a MeshType, skip it because this is handled by the server and is not a direct user input
+                            parameter_type = parameter_types.get(parameter, str)
+                            if isinstance(parameter_type, type) and issubclass(parameter_type, MeshType):
+                                continue
+                            # Get the parameter's type, defaulting to str if no annotation exists
+                            parameter_type_name = parameter_type.__name__
+                            # Format as "parameter=<type>"
+                            query_parameters.append(f"{parameter}=[{parameter_type_name}]")
+                        # Construct the full route with query parameters only if there are user-facing parameters
+                        if query_parameters:
+                            route_with_params = f"{route}?{'&'.join(query_parameters)}"
+                        # In the case of no user-facing parameters, use the route as-is
+                        else:
+                            route_with_params = route
+
+                    else:
+                        # Route has no parameters, use path as-is
+                        route_with_params = route
+
+                    # Categorize the formatted route by its intended return type
+                    if route_info["intended_return_type"] == "text":
+                        text_routes.append(route_with_params)
+                    elif route_info["intended_return_type"] == "html":
+                        html_routes.append(route_with_params)
 
                 # Format routes as newline-separated lists for the error message
                 text_routes_str = "\n".join(text_routes)
@@ -748,14 +787,25 @@ class MeshPagesServer:
 
             # Get the signature of the function
             signature = inspect.signature(func)
-            # Get the parameters of the function
-            parameters = list(signature.parameters.keys())
-            logger.debug(f"Registering route: {path} (returns {intended_return_type}) with parameters: {parameters}")
+
+            # Get the parameters of the function with their type annotations
+            # If no type annotation exists, default to str
+            parameters_with_types = {}
+            for param_name, param in signature.parameters.items():
+                if param.annotation == inspect.Parameter.empty:
+                    parameters_with_types[param_name] = str
+                else:
+                    parameters_with_types[param_name] = param.annotation
+
+            parameter_names = list(parameters_with_types.keys())
+            logger.debug(f"Registering route: {path} (returns {intended_return_type}) with parameters: {parameters_with_types}")
+
             # Store the handler function and its response type and parameters in the routes dictionary
             self.routes[path] = {
                 "func": func,
                 "intended_return_type": intended_return_type,
-                "parameters": parameters,
+                "parameters": parameter_names,
+                "parameter_types": parameters_with_types,
             }
             return func
 
