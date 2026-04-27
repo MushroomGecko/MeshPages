@@ -10,8 +10,9 @@ import meshtastic.stream_interface
 import meshtastic.tcp_interface
 from pubsub import pub
 
+from meshpages.enums import StatusCodes
 from meshpages.models import ResponsePacket
-from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet, get_node_db_info, parse_hostname
+from meshpages.utils import CHUNKABLE_STATUS_CODES, compress_payload, decode_packet, decompress_payload, encode_packet, get_node_db_info, parse_hostname
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -190,9 +191,10 @@ class MeshPagesClient:
             self.response_event.set()
             return formatted_message
 
-        # Handle ResponsePacket with non-200 status code (error response from server)
-        if isinstance(response_packet, ResponsePacket) and response_packet.status_code != 200:
-            # Status code responses include plain text error messages (not compressed)
+        # Handle ResponsePacket with non-chunkable status code (error response from server)
+        # Note: Chunkable codes like 404 bypass this check and are handled as normal responses
+        if isinstance(response_packet, ResponsePacket) and response_packet.status_code not in CHUNKABLE_STATUS_CODES:
+            # Error responses are single-chunk, plain text messages (not compressed)
             response_packet_content = response_packet.content if isinstance(response_packet.content, str) else response_packet.content.decode("utf-8")
             logger.info(f"Received error response from server: status={response_packet.status_code}")
             # Wrap in <pre> tag to preserve newlines and whitespace from server
@@ -253,7 +255,8 @@ class MeshPagesClient:
                 logger.debug(f"Received PRIVATE_APP chunk from {from_id}: chunk {response_packet.current_chunk_id if response_packet else '?'}/{response_packet.total_chunks if response_packet else '?'}")
 
                 # Immediate error response: status code indicates server error, decompress and return
-                if response_packet and response_packet.status_code != 200:
+                # 404 is an exception because the length of the route suggestions is variable.
+                if response_packet and response_packet.status_code not in CHUNKABLE_STATUS_CODES:
                     logger.info(f"Received error response from {from_id}: status={response_packet.status_code}")
                     self.payload_string = decompress_payload(response_packet.content)
                     self._reset_state()
@@ -380,7 +383,7 @@ class MeshPagesClient:
             ResponsePacket(
                 current_chunk_id=1,
                 total_chunks=1,
-                status_code=200,
+                status_code=StatusCodes.SUCCESS,
                 content=compressed_payload,
             )
         )

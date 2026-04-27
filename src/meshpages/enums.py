@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, IntEnum
 
 
 class ChannelPresets(Enum):
@@ -30,3 +30,37 @@ class ChannelPresets(Enum):
     LONG_FAST = {"sf": 11, "coding_rate": 4 / 5, "bandwidth_khz": 250}
     LONG_MODERATE = {"sf": 11, "coding_rate": 4 / 8, "bandwidth_khz": 125}
     LONG_SLOW = {"sf": 12, "coding_rate": 4 / 8, "bandwidth_khz": 125}
+
+
+class StatusCodes(IntEnum):
+    """
+    HTTP status codes for mesh network responses.
+
+    Standard HTTP-like status codes used to communicate the result of mesh network
+    requests. These codes indicate whether a request was successful, encountered a
+    client error, or a server error. As IntEnum members, they behave as integers
+    and can be used directly in comparisons and operations.
+
+    Attributes:
+        SUCCESS: Request completed successfully.
+        BAD_REQUEST: The request was malformed or invalid.
+        UNAUTHORIZED: The request requires authentication.
+        FORBIDDEN: The authenticated user doesn't have permission for this resource.
+        NOT_FOUND: The requested resource or endpoint does not exist.
+        NOT_IMPLEMENTED: The requested functionality is not implemented.
+        INTERNAL_SERVER_ERROR: An unexpected error occurred on the server.
+        BAD_GATEWAY: Invalid response from upstream server.
+        SERVICE_UNAVAILABLE: The service is temporarily unavailable.
+        GATEWAY_TIMEOUT: Upstream server failed to respond in time.
+    """
+
+    SUCCESS = 200
+    BAD_REQUEST = 400
+    UNAUTHORIZED = 401
+    FORBIDDEN = 403
+    NOT_FOUND = 404
+    NOT_IMPLEMENTED = 501
+    BAD_GATEWAY = 502
+    INTERNAL_SERVER_ERROR = 500
+    SERVICE_UNAVAILABLE = 503
+    GATEWAY_TIMEOUT = 504

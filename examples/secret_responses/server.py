@@ -2,6 +2,7 @@ from pathlib import Path
 
 from meshpages import MeshPagesServer
 from meshpages.enums import ChannelPresets
+from meshpages.types import ClientID
 
 # Get the directory where this script is located
 script_dir = Path(__file__).parent
@@ -22,25 +23,44 @@ app = MeshPagesServer(
 
 print("Mesh Server Running...")
 
+allowed_clients = [
+    # "!a4c3b8f2",
+    # "!7d9e2c51",
+    # "!f3a7e0b9",
+    # "!2c5d8a9b",
+    # YOUR CLIENT ID HERE
+]
 
-@app.page("/home", intended_return_type="html")
-def home_page():
+correct_password = "password"
+
+
+@app.page("/secret_html", intended_return_type="html")
+def secret_html_page(client_id: ClientID, password: str):
+    print("CLIENT ID: ", client_id)
+    print("PASSWORD: ", password)
+
+    if client_id not in allowed_clients:
+        return f"Unauthorized: {client_id} is not in the allowed clients list. Whomp whomp."
+
+    if password != correct_password:
+        return "Unauthorized: The password is incorrect. Whomp whomp."
+
     with open(script_dir / "templates" / "home.html", "r") as file:
         return file.read()
 
 
-@app.page("/bees", intended_return_type="text")
-def bees_page():
-    return """According to all known laws of aviation, there is no way a bee should be able to fly.
-Its wings are too small to get its fat little body off the ground.
-The bee, of course, flies anyway because bees don't care what humans think is impossible.
-Yellow, black. Yellow, black. Yellow, black. Yellow, black.
-Ooh, black and yellow!
-Let's shake it up a little.
-Barry! Breakfast is ready!
-Coming!
-Hang on a second.
-"""
+@app.page("/secret_text", intended_return_type="text")
+def secret_text_page(client_id: ClientID, password: str):
+    print("CLIENT ID: ", client_id)
+    print("PASSWORD: ", password)
+
+    if client_id not in allowed_clients:
+        return f"Unauthorized: {client_id} is not in the allowed clients list. Whomp whomp."
+
+    if password != correct_password:
+        return "Unauthorized: The password is incorrect. Whomp whomp."
+
+    return "You've been Rickrolled! 🎵 Never gonna give you up. Never gonna let you down. 😎"
 
 
 app.run()

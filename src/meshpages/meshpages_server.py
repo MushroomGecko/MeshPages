@@ -1,8 +1,9 @@
+import inspect
 import logging
 import math
 import os
-import time
 import threading
+import time
 from queue import Queue
 from typing import Callable, Iterator, Literal, Union
 
@@ -16,9 +17,18 @@ import minify_html_onepass
 from pubsub import pub
 
 from meshpages.air_traffic_control import AirTrafficControl
-from meshpages.channel_presets import ChannelPresets
+from meshpages.enums import ChannelPresets, StatusCodes
 from meshpages.models import Config, ResponsePacket, User
-from meshpages.utils import compress_payload, decode_packet, decompress_payload, encode_packet, parse_hostname
+from meshpages.types import MeshType
+from meshpages.utils import (
+    CHUNKABLE_STATUS_CODES,
+    compress_payload,
+    decode_packet,
+    decompress_payload,
+    encode_packet,
+    parse_hostname,
+    parse_parameters,
+)
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -195,7 +205,7 @@ class MeshPagesServer:
     def _get_chunks(
         self,
         payload: str | bytes,
-        status_code: int = 200,
+        status_code: int = StatusCodes.SUCCESS,
     ) -> Iterator[ResponsePacket]:
         """
         Chunk a payload into transmission-sized packets.
@@ -206,7 +216,7 @@ class MeshPagesServer:
 
         Parameters:
             payload (str | bytes): The response payload to chunk (HTML, text, or compressed bytes).
-            status_code (int): HTTP status code (200 for success, other values for errors). Defaults to 200.
+            status_code (int): HTTP status code (SUCCESS for success, other values for errors). Defaults to SUCCESS.
 
         Yields:
             ResponsePacket: Response packets ready for transmission, one chunk per iteration.
@@ -219,7 +229,7 @@ class MeshPagesServer:
         logger.debug(f"Calculating chunks: payload_length={payload_length}, buffer_offset={BUFFER_OFFSET}")
 
         # Error responses are always sent as single chunk (not split across multiple packets)
-        if status_code != 200:
+        if status_code not in CHUNKABLE_STATUS_CODES:
             if isinstance(payload, str):
                 raw = payload.encode("utf-8")
                 as_str = True
@@ -250,7 +260,7 @@ class MeshPagesServer:
         if total_chunks > 255:
             logger.error(f"Payload too large: requires {total_chunks} chunks, max is 255. Sending error response.")
             total_chunks = 1
-            status_code = 500
+            status_code = StatusCodes.INTERNAL_SERVER_ERROR
             payload = "Too many chunks to send. Please try again later.".encode("utf-8")
 
         logger.debug(f"Total chunks: {total_chunks}")
@@ -341,7 +351,7 @@ class MeshPagesServer:
                 self.air_traffic_control.add_packet_sent(len(chunk))
 
                 # Stop sending further chunks if error status (error responses are single-chunk only)
-                if status_code != 200:
+                if status_code not in CHUNKABLE_STATUS_CODES:
                     return
 
                 # Courtesy delay between chunks to give receiver time to process
@@ -390,7 +400,7 @@ class MeshPagesServer:
                 logger.debug(f"Text response chunk recorded for air traffic control ({len(response_packet.content)} bytes)")
 
                 # Stop sending further chunks if error status (error responses are single-chunk only)
-                if status_code != 200:
+                if status_code not in CHUNKABLE_STATUS_CODES:
                     return
 
                 # Courtesy delay between chunks to give receiver time to process
@@ -399,17 +409,20 @@ class MeshPagesServer:
             logger.error(f"Invalid response type: {response_type}. Must be one of: {INTENDED_RETURN_TYPES}")
             raise ValueError(f"Invalid response type: {response_type}. Must be one of: {INTENDED_RETURN_TYPES}")
 
-    def _throw_error_response(self, from_id: str, error_message: str, status_code: int) -> None:
+    def _throw_error_response(self, from_id: str, error_message: str, status_code: int, intended_return_type: str = "text") -> None:
         """
         Queue an error response to be sent back to a client.
 
         Creates a User object with error details and queues it for transmission.
-        Error responses are always sent as plain text type.
+        Error responses are typically sent as plain text, but may be HTML when the
+        error message requires formatted content for complete client-side rendering
+        (e.g., route listings, detailed error pages).
 
         Parameters:
             from_id (str): The client's node ID to send the error to.
             error_message (str): The error message content to send.
             status_code (int): HTTP status code (e.g., 400, 404, 500).
+            intended_return_type (str): Response format - "text" or "html". Defaults to "text".
 
         Returns:
             None
@@ -419,7 +432,7 @@ class MeshPagesServer:
             User(
                 from_id=from_id,
                 result=error_message,
-                intended_return_type="text",
+                intended_return_type=intended_return_type,
                 status_code=status_code,
                 time_received=time.time(),
             )
@@ -543,30 +556,47 @@ class MeshPagesServer:
                 logger.debug(f"Failed to decode as binary packet from {from_id} (expected for text requests): {type(e).__name__}")
                 message_request_type = "text"
 
-            logger.debug(f"Received request from {from_id}: type={message_request_type}, route={'<recognized>' if text in self.routes else '<not found>'}")
+            # Parse the incoming request into path and query parameters
+            # Split on first "?" only to separate the endpoint path from query string
+            # Using split("?", 1) instead of split("?") ensures that any "?" characters in query parameter values
+            # (such as in LLM prompts or questions) are preserved (though they should ideally be URL-encoded as %3F)
+            query_string = text.strip().split("?", 1)
+            # Extract the path (everything before the "?")
+            path = query_string[0].strip()
+            # Extract and parse query parameters if they exist
+            # If no query string present or it's empty/whitespace, default to empty dict
+            request_parameters = parse_parameters(query_string[1].strip()) if len(query_string) > 1 and query_string[1].strip() else {}
+
+            logger.debug(f"Query string split: path='{path}', has_query={len(query_string) > 1}, request_parameters={request_parameters}")
+            logger.debug(f"Received request from {from_id}: type={message_request_type}, route={'<recognized>' if path in self.routes else '<not found>'}")
 
             # Check if the message is a valid endpoint
-            if text and text in self.routes:
-                # Get the function and intended return type associated with the endpoint
-                func = self.routes[text]["func"]
-                intended_return_type = self.routes[text]["intended_return_type"]
+            if path and path in self.routes:
+                # Log the parsed parameters for debugging
+                logger.debug(f"Request parameters: {request_parameters}")
+
+                # Get the function, intended return type, route parameters, and parameter types associated with the endpoint
+                func = self.routes[path]["func"]
+                intended_return_type = self.routes[path]["intended_return_type"]
+                route_parameters = self.routes[path]["parameters"]
+                parameter_types = self.routes[path]["parameter_types"]
 
                 # Validate that the client type matches the endpoint's expected type
                 # Send user-friendly error messages for common mismatches
                 if message_request_type == "text" and intended_return_type == "html":
-                    logger.info(f"Request mismatch from {from_id}: text client requesting HTML endpoint {text}")
+                    logger.info(f"Request mismatch from {from_id}: text client requesting HTML endpoint {path}")
                     self._throw_error_response(
                         from_id,
                         "This endpoint requires the MeshPages web client. Please use the web client instead of the Meshtastic app.",
-                        400,
+                        StatusCodes.BAD_REQUEST,
                     )
                     return
                 elif message_request_type == "html" and intended_return_type == "text":
-                    logger.info(f"Request mismatch from {from_id}: HTML client requesting text endpoint {text}")
+                    logger.info(f"Request mismatch from {from_id}: HTML client requesting text endpoint {path}")
                     self._throw_error_response(
                         from_id,
                         "This endpoint requires the Meshtastic app. Please use the Meshtastic app instead of the MeshPages web client.",
-                        400,
+                        StatusCodes.BAD_REQUEST,
                     )
                     return
                 # Catch unexpected request types (edge case: malformed or hacked requests)
@@ -575,15 +605,45 @@ class MeshPagesServer:
                     self._throw_error_response(
                         from_id,
                         f"Message request type {message_request_type} does not match intended return type {intended_return_type}",
-                        400,
+                        StatusCodes.BAD_REQUEST,
                     )
                     return
 
-                # Call the function associated with the endpoint
-                result = func()
+                # Extract only the expected parameters from the incoming request
+                # This filters out any extra/unknown parameters and sets missing parameters appropriately
+                filtered_parameters = {}
+                for parameter in route_parameters:
+                    # Get the parameter type from the parameter types dictionary
+                    parameter_type = parameter_types.get(parameter, str)
 
-                # Set the status code to 200
-                status_code = 200
+                    # Check if this parameter type is a MeshType
+                    if isinstance(parameter_type, type) and issubclass(parameter_type, MeshType):
+                        # MeshType parameters are generated from the packet, not from request
+                        # Instantiate the MeshType and pass the instance
+                        filtered_parameters[parameter] = parameter_type(packet)
+                    elif parameter in request_parameters:
+                        # Parameter was provided in the request: use the incoming value
+                        filtered_parameters[parameter] = request_parameters[parameter]
+                    else:
+                        # Parameter was not provided: set to None so the function gets all expected params
+                        filtered_parameters[parameter] = None
+
+                try:
+                    # Call the function associated with the endpoint with only expected parameters
+                    result = func(**filtered_parameters)
+                except Exception as e:
+                    # Log the full error details for debugging and diagnostics
+                    logger.error(f"Error calling function for {from_id} on {path}: {e}")
+                    # Send generic error message to client (don't expose internal error details for security)
+                    self._throw_error_response(
+                        from_id,
+                        "An error occurred processing your request. Please try again.",
+                        StatusCodes.INTERNAL_SERVER_ERROR,
+                    )
+                    return
+
+                # Set the status code to 200 on successful execution
+                status_code = StatusCodes.SUCCESS
 
                 # Add the user to the user queue
                 self.user_queue.put(
@@ -604,22 +664,56 @@ class MeshPagesServer:
                 text_routes = []
                 html_routes = []
 
-                # Categorize routes by their intended return type
+                # Categorize routes by their intended return type with parameter type hints
+                # Loop through all registered routes to format them with type information
                 for route in self.routes:
-                    if self.routes[route]["intended_return_type"] == "text":
-                        text_routes.append(route)
-                    elif self.routes[route]["intended_return_type"] == "html":
-                        html_routes.append(route)
+                    # Get the route metadata (function, return type, parameters, etc.)
+                    route_info = self.routes[route]
+                    parameters = route_info.get("parameters", [])
+                    parameter_types = route_info.get("parameter_types", {})
+
+                    # Build query string example with type hints for documentation
+                    if parameters:
+                        query_parameters = []
+                        # Build each parameter example showing its type (e.g., username=<str>)
+                        for parameter in parameters:
+                            # If the parameter is a MeshType, skip it because this is handled by the server and is not a direct user input
+                            parameter_type = parameter_types.get(parameter, str)
+                            if isinstance(parameter_type, type) and issubclass(parameter_type, MeshType):
+                                continue
+                            # Get the parameter's type, defaulting to str if no annotation exists
+                            parameter_type_name = parameter_type.__name__
+                            # Format as "parameter=<type>"
+                            query_parameters.append(f"{parameter}=[{parameter_type_name}]")
+                        # Construct the full route with query parameters only if there are user-facing parameters
+                        if query_parameters:
+                            route_with_params = f"{route}?{'&'.join(query_parameters)}"
+                        # In the case of no user-facing parameters, use the route as-is
+                        else:
+                            route_with_params = route
+
+                    else:
+                        # Route has no parameters, use path as-is
+                        route_with_params = route
+
+                    # Categorize the formatted route by its intended return type
+                    if route_info["intended_return_type"] == "text":
+                        text_routes.append(route_with_params)
+                    elif route_info["intended_return_type"] == "html":
+                        html_routes.append(route_with_params)
 
                 # Format routes as newline-separated lists for the error message
                 text_routes_str = "\n".join(text_routes)
                 html_routes_str = "\n".join(html_routes)
 
                 # Return a 404 error with helpful suggestions about available routes (text routes for Meshtastic App, html routes for MeshPages Web Client)
+                route_error_message = f"Invalid. Choose from the following routes:\nMeshtastic App:\n{text_routes_str}\nMeshPages Web Client:\n{html_routes_str}"
+                route_error_message = f"<pre style='color: orange; white-space: pre-wrap; word-wrap: break-word; font-family: monospace;'>{route_error_message}</pre>" if message_request_type == "html" else route_error_message
                 self._throw_error_response(
                     from_id,
-                    f"Invalid. Choose from the following routes:\nMeshtastic App:\n{text_routes_str}\nMeshPages Web Client:\n{html_routes_str}",
-                    404,
+                    route_error_message,
+                    StatusCodes.NOT_FOUND,
+                    message_request_type,
                 )
 
                 return
@@ -682,20 +776,40 @@ class MeshPagesServer:
             ValueError: If intended_return_type is not "html" or "text".
         """
 
-        # Define the inner decorator function that performs the registration
-        def decorator(func: Callable):
-            logger.debug(f"Registering route: {path} (returns {intended_return_type})")
-            # Store the handler function and its response type in the routes dictionary
-            self.routes[path] = {
-                "func": func,
-                "intended_return_type": intended_return_type,
-            }
-            return func
-
         # Validate the response type before registering the handler
         if intended_return_type not in INTENDED_RETURN_TYPES:
             logger.error(f"Invalid intended return type: {intended_return_type}. Must be one of: {INTENDED_RETURN_TYPES}")
             raise ValueError(f"Invalid intended return type: {intended_return_type}. Must be one of: {INTENDED_RETURN_TYPES}")
+
+        # Define the inner decorator function that performs the registration
+        def decorator(func: Callable):
+            # Check if this endpoint is already registered
+            if path in self.routes:
+                raise ValueError(f"Endpoint '{path}' is already registered with return type '{self.routes[path]['intended_return_type']}'. Cannot register the same endpoint twice, even with different return types.")
+
+            # Get the signature of the function
+            signature = inspect.signature(func)
+
+            # Get the parameters of the function with their type annotations
+            # If no type annotation exists, default to str
+            parameters_with_types = {}
+            for param_name, param in signature.parameters.items():
+                if param.annotation == inspect.Parameter.empty:
+                    parameters_with_types[param_name] = str
+                else:
+                    parameters_with_types[param_name] = param.annotation
+
+            parameter_names = list(parameters_with_types.keys())
+            logger.debug(f"Registering route: {path} (returns {intended_return_type}) with parameters: {parameters_with_types}")
+
+            # Store the handler function and its response type and parameters in the routes dictionary
+            self.routes[path] = {
+                "func": func,
+                "intended_return_type": intended_return_type,
+                "parameters": parameter_names,
+                "parameter_types": parameters_with_types,
+            }
+            return func
 
         logger.info(f"Route registered: {path} -> {intended_return_type}")
         return decorator

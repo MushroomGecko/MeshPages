@@ -269,6 +269,183 @@ app.run()
 sudo ./.venv/bin/python your_server.py
 ```
 
+### GET-Style Requests with Query Parameters
+
+MeshPages supports GET-style requests where you can pass parameters through a query string, similar to HTTP GET requests. This follows the same **FastAPI-inspired decorator pattern** used throughout MeshPages, where function parameters automatically map to query string parameters.
+
+#### Query String Syntax
+
+Requests with query parameters use the format:
+
+```
+/endpoint?parameter1=value1&parameter2=value2&parameter3=value3
+```
+
+Example requests:
+```
+/llm_text?prompt=What+is+the+weather
+/secret_html?password=mypassword
+/calculate?x=10&y=20
+```
+
+#### Defining Endpoints with Parameters
+
+Define your endpoint function with parameters that correspond to query string keys:
+
+```python
+from meshpages import MeshPagesServer
+
+app = MeshPagesServer()
+
+@app.page("/greet", intended_return_type="text")
+def greet_user(name: str, greeting: str = "Hello"):
+    return f"{greeting}, {name}!"
+
+app.run()
+```
+
+With this endpoint, clients can request:
+```
+/greet?name=Alice
+/greet?name=Bob&greeting=Hi
+```
+
+#### Parameter Types
+
+MeshPages automatically converts query parameters to the specified type. You can use Python type hints to indicate expected parameter types:
+
+```python
+@app.page("/calculate", intended_return_type="text")
+def calculate(x: int, y: int, operation: str = "add"):
+    if operation == "add":
+        return str(x + y)
+    elif operation == "multiply":
+        return str(x * y)
+    return "Unknown operation"
+
+@app.page("/settings", intended_return_type="text")
+def settings(enabled: bool, timeout: float):
+    return f"Enabled: {enabled}, Timeout: {timeout}s"
+```
+
+Supported types include: `str`, `int`, `float`, `bool`
+
+#### Special Parameter Types: MeshTypes
+
+For parameters that need special handling within the mesh network, use `MeshType` subclasses. These are automatically populated from the incoming packet rather than from query parameters.
+
+##### Using ClientID
+
+The `ClientID` type automatically extracts the client's mesh node ID from the packet:
+
+```python
+from meshpages import MeshPagesServer
+from meshpages.types import ClientID
+
+app = MeshPagesServer()
+
+@app.page("/secret_html", intended_return_type="html")
+def secret_page(client_id: ClientID, password: str):
+    # client_id is automatically populated from the packet
+    allowed_clients = ["!a4c3b8f2", "!7d9e2c51"]
+    
+    if str(client_id) not in allowed_clients:
+        return "Unauthorized: You don't have access to this endpoint."
+    
+    if password != "correct_password":
+        return "Unauthorized: Invalid password."
+    
+    return "<html><body><h1>Welcome!</h1></body></html>"
+
+app.run()
+```
+
+When a client sends a request like:
+```
+/secret_html?password=correct_password
+```
+
+The `ClientID` parameter is automatically extracted from the packet's `fromId` field, while `password` comes from the query string.
+
+#### Handling Missing or Optional Parameters
+
+If a parameter is not provided in the query string, it will be set to `None` by the framework. You must handle validation in your function body:
+
+```python
+@app.page("/search", intended_return_type="text")
+def search(query: str, filter: str = None):
+    if query is None:
+        return "Error: query parameter is required"
+    
+    if filter:
+        return f"Searching for '{query}' with filter '{filter}'"
+    else:
+        return f"Searching for '{query}'"
+
+# Both requests work:
+# /search?query=meshpages
+# /search?query=meshpages&filter=recent
+
+# But this will trigger the error:
+# /search
+```
+
+There is no automatic validation for required parameters. Even if you don't provide a default value in your function signature, the framework will still pass `None` if the parameter is missing from the query string:
+
+```python
+@app.page("/lookup", intended_return_type="text")
+def lookup(user_id: str):
+    # user_id can still be None if not provided in the query string
+    if user_id is None:
+        return "Error: user_id parameter is required"
+    return f"Looking up user: {user_id}"
+
+# All of these requests will be processed (user_id will be None in the last one):
+# /lookup?user_id=12345
+# /lookup
+```
+
+#### URL Encoding
+
+Query parameters are automatically URL-decoded by `parse_qsl`. Common encodings handled include:
+
+- Spaces: `+`, `%20`, or literal spaces all become space
+- Special characters: `%XX` → character (where XX is hex)
+
+```python
+@app.page("/message", intended_return_type="text")
+def message(text: str):
+    return f"Message: {text}"
+
+# All of these work and produce the same result:
+# /message?text=hello+world
+# /message?text=hello%20world
+# /message?text=hello world
+```
+
+#### Route Documentation
+
+When a client requests an invalid endpoint, MeshPages automatically generates helpful documentation showing all available routes with their parameter types:
+
+```
+Available text routes:
+/greet?name=[str]&greeting=[str]
+/calculate?x=[int]&y=[int]&operation=[str]
+/message?text=[str]
+
+Available html routes:
+/secret_html?password=[str]
+```
+
+Note: MeshType parameters (like `ClientID`) are not shown in the documentation since they're automatically populated and not user-provided.
+
+#### Examples
+
+See these complete examples for GET-style requests in action:
+
+- **LLM Responses**: `examples/llm_responses/server.py` - Uses query parameters for prompts
+- **Secret Responses**: `examples/secret_responses/server.py` - Uses `ClientID` type and password parameter
+
 ### Example: Test MeshPages Server
 
 A complete example server is included at `examples/simple_responses/server.py`:

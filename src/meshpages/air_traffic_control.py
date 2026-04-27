@@ -3,7 +3,7 @@ from math import pow
 from queue import Queue
 from typing import Union
 
-from meshpages.channel_presets import ChannelPresets
+from meshpages.enums import ChannelPresets
 from meshpages.models import Config, PacketHistory
 
 
