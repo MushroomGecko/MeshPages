@@ -271,7 +271,7 @@ sudo ./.venv/bin/python your_server.py
 
 ### GET-Style Requests with Query Parameters
 
-MeshPages supports GET-style requests where you can pass parameters through a query string, similar to HTTP GET requests. This allows your endpoints to accept and process dynamic data from clients.
+MeshPages supports GET-style requests where you can pass parameters through a query string, similar to HTTP GET requests. This follows the same **FastAPI-inspired decorator pattern** used throughout MeshPages, where function parameters automatically map to query string parameters.
 
 #### Query String Syntax
 
