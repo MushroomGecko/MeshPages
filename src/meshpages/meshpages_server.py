@@ -557,8 +557,10 @@ class MeshPagesServer:
                 message_request_type = "text"
 
             # Parse the incoming request into path and query parameters
-            # Split on "?" to separate the endpoint path from query string
-            query_string = text.strip().split("?")
+            # Split on first "?" only to separate the endpoint path from query string
+            # Using split("?", 1) instead of split("?") ensures that any "?" characters in query parameter values
+            # (such as in LLM prompts or questions) are preserved (though they should ideally be URL-encoded as %3F)
+            query_string = text.strip().split("?", 1)
             # Extract the path (everything before the "?")
             path = query_string[0].strip()
             # Extract and parse query parameters if they exist
