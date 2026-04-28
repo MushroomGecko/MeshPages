@@ -263,6 +263,44 @@ def status_page():
 app.run()
 ```
 
+### Response Types: HTML, TEXT, and BOTH
+
+When defining routes with the `@app.page()` decorator, you specify the `intended_return_type` parameter to control how the endpoint communicates with clients. MeshPages supports three response types:
+
+#### HTML Responses
+Use `intended_return_type="html"` for endpoints that return HTML content. These are optimized for the MeshPages Web Client and are automatically minified, compressed, and contain headers for efficient transmission:
+
+```python
+@app.page("/dashboard", intended_return_type="html")
+def dashboard():
+    return "<html><body><h1>Dashboard</h1><p>Status: Online</p></body></html>"
+```
+
+#### TEXT Responses
+Use `intended_return_type="text"` for plain text endpoints. These work with the Meshtastic Android/iOS app and are sent as plaintext without compression:
+
+```python
+@app.page("/weather", intended_return_type="text")
+def weather():
+    return "Current temperature: 72°F, Sunny"
+```
+
+#### BOTH Responses (Default)
+Use `intended_return_type="both"` (or omit the parameter, as it's the default) to create universal endpoints that accept requests from both MeshPages Web Client and Meshtastic app clients. The server automatically responds in the format the client requested:
+
+```python
+@app.page("/info")  # Default: intended_return_type="both"
+def info():
+    return "Welcome to MeshPages!"  # Works for HTML clients and for text clients
+```
+
+When using `intended_return_type="both"`, the response is sent in the client's requested format:
+- HTML clients receive a compressed response with headers 
+- Text clients receive the same content as plain text
+
+This is the recommended approach for most endpoints, as it maximizes compatibility across different mesh clients.
+```
+
 ### Running a Custom Server
 
 ```bash

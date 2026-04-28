@@ -66,13 +66,8 @@ app = MeshPagesServer(
 print("Mesh Server Running...")
 
 
-@app.page("/llm_html", intended_return_type="html")
+@app.page("/llm", intended_return_type="both")
 def llm_page_html(prompt: str):
-    return llm_text_response(prompt)
-
-
-@app.page("/llm_text", intended_return_type="text")
-def llm_page_text(prompt: str):
     return llm_text_response(prompt)
 
 

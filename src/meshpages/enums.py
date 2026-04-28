@@ -1,4 +1,4 @@
-from enum import Enum, IntEnum
+from enum import Enum, IntEnum, StrEnum
 
 
 class ChannelPresets(Enum):
@@ -64,3 +64,18 @@ class StatusCodes(IntEnum):
     INTERNAL_SERVER_ERROR = 500
     SERVICE_UNAVAILABLE = 503
     GATEWAY_TIMEOUT = 504
+
+
+class ReturnTypes(StrEnum):
+    """
+    Supported content types for responses from endpoint handlers.
+
+    Defines the format in which responses are sent to mesh clients:
+    - HTML: Binary-encoded responses with minification and compression for web clients
+    - TEXT: Plain text responses for Meshtastic app clients
+    - BOTH: Endpoints that support both HTML and text response formats
+    """
+
+    HTML = "html"
+    TEXT = "text"
+    BOTH = "both"

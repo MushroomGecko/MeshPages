@@ -12,7 +12,15 @@ from pubsub import pub
 
 from meshpages.enums import StatusCodes
 from meshpages.models import ResponsePacket
-from meshpages.utils import CHUNKABLE_STATUS_CODES, compress_payload, decode_packet, decompress_payload, encode_packet, get_node_db_info, parse_hostname
+from meshpages.utils import (
+    CHUNKABLE_STATUS_CODES,
+    compress_payload,
+    decode_packet,
+    decompress_payload,
+    encode_packet,
+    get_node_db_info,
+    parse_hostname,
+)
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
