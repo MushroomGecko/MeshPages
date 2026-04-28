@@ -17,7 +17,7 @@ import minify_html_onepass
 from pubsub import pub
 
 from meshpages.air_traffic_control import AirTrafficControl
-from meshpages.enums import ChannelPresets, StatusCodes
+from meshpages.enums import ChannelPresets, ReturnTypes, StatusCodes
 from meshpages.models import Config, ResponsePacket, User
 from meshpages.types import MeshType
 from meshpages.utils import (
@@ -53,7 +53,8 @@ TEXT_MESSAGE_APP = "TEXT_MESSAGE_APP"
 # Meshtastic portnum for mesh routing information
 ROUTING_APP = "ROUTING_APP"
 # Supported content types for responses from endpoint handlers
-INTENDED_RETURN_TYPES = ["html", "text"]
+# Supported content types for responses from endpoint handlers
+INTENDED_RETURN_TYPES = [ReturnTypes.HTML, ReturnTypes.TEXT, ReturnTypes.BOTH]
 
 
 class MeshPagesServer:
@@ -163,7 +164,7 @@ class MeshPagesServer:
         self.current_client_node_id = None
         # Last chunk sent to current client (cached for retry attempts on transmission error)
         self.current_client_message = None
-        # Response type of current message: "html" (binary) or "text" (plaintext)
+        # Response type of current message: HTML (binary) or TEXT (plaintext)
         self.response_type = None
         # Synchronization primitive: sender waits on this for ACK, receiver signals completion
         self.response_event = threading.Event()
@@ -290,7 +291,7 @@ class MeshPagesServer:
 
         Parameters:
             response_string (str): The response content (HTML or plain text).
-            response_type (str): Response format - "html" or "text". Determines compression and formatting.
+            response_type (str): Response format - HTML or TEXT. Determines compression and formatting.
             status_code (int): HTTP status code (200 for success, 4xx/5xx for errors).
             destination_id (str): Target node ID to send response to.
 
@@ -298,10 +299,10 @@ class MeshPagesServer:
             None
 
         Raises:
-            ValueError: If response_type is not "html" or "text".
+            ValueError: If response_type is not HTML or TEXT.
         """
         logger.info(f"Sending response to {destination_id}: status={status_code}, type={response_type}")
-        if response_type == "html":
+        if response_type == ReturnTypes.HTML:
             # Remove unnecessary whitespace and HTML comments from the response to reduce size
             response_string = minify_html_onepass.minify(response_string)
             logger.debug(f"Minified response size: {len(response_string)} characters")
@@ -356,7 +357,7 @@ class MeshPagesServer:
 
                 # Courtesy delay between chunks to give receiver time to process
                 time.sleep(self.courtousy_interval)
-        elif response_type == "text":
+        elif response_type == ReturnTypes.TEXT:
             # Send plain text responses as a sequence of TEXT_MESSAGE packets, one per chunk
             for response_packet in self._get_chunks(response_string, status_code=status_code):
                 # Get the current chunk of the response
@@ -409,7 +410,7 @@ class MeshPagesServer:
             logger.error(f"Invalid response type: {response_type}. Must be one of: {INTENDED_RETURN_TYPES}")
             raise ValueError(f"Invalid response type: {response_type}. Must be one of: {INTENDED_RETURN_TYPES}")
 
-    def _throw_error_response(self, from_id: str, error_message: str, status_code: int, intended_return_type: str = "text") -> None:
+    def _throw_error_response(self, from_id: str, error_message: str, status_code: int, intended_return_type: str = ReturnTypes.TEXT) -> None:
         """
         Queue an error response to be sent back to a client.
 
@@ -422,7 +423,7 @@ class MeshPagesServer:
             from_id (str): The client's node ID to send the error to.
             error_message (str): The error message content to send.
             status_code (int): HTTP status code (e.g., 400, 404, 500).
-            intended_return_type (str): Response format - "text" or "html". Defaults to "text".
+            intended_return_type (str): Response format - TEXT or HTML. Defaults to TEXT.
 
         Returns:
             None
@@ -493,9 +494,9 @@ class MeshPagesServer:
                     if self.current_client_message and self.response_type:
                         logger.info(f"Retrying message to {self.current_client_node_id} (attempt {self.current_event_retries + 1}/{self.event_retries}), error: {error_reason}")
                         # Resend the cached chunk using the same method (sendData for html, sendText for text)
-                        if self.response_type == "html":
+                        if self.response_type == ReturnTypes.HTML:
                             self.interface.sendData(self.current_client_message, destinationId=self.current_client_node_id, wantAck=self.message_ack)
-                        elif self.response_type == "text":
+                        elif self.response_type == ReturnTypes.TEXT:
                             self.interface.sendText(self.current_client_message, destinationId=self.current_client_node_id, wantAck=self.message_ack)
                         else:
                             logger.error(f"Invalid response type: {self.response_type}. Must be one of: {INTENDED_RETURN_TYPES}")
@@ -545,16 +546,16 @@ class MeshPagesServer:
                 if decompressed_payload:
                     # Successfully decoded and decompressed: this is a web client request
                     text = decompressed_payload
-                    message_request_type = "html"
+                    message_request_type = ReturnTypes.HTML
                     logger.debug(f"Successfully decoded HTML request from {from_id}")
                 else:
                     # Decoded but decompressed to empty: treat as text fallback
                     logger.debug(f"Empty decompressed payload from {from_id}, treating as text fallback")
-                    message_request_type = "text"
+                    message_request_type = ReturnTypes.TEXT
             except Exception as e:
                 # Failed to decode as packet: this is a plain text request (Meshtastic app)
                 logger.debug(f"Failed to decode as binary packet from {from_id} (expected for text requests): {type(e).__name__}")
-                message_request_type = "text"
+                message_request_type = ReturnTypes.TEXT
 
             # Parse the incoming request into path and query parameters
             # Split on first "?" only to separate the endpoint path from query string
@@ -583,7 +584,7 @@ class MeshPagesServer:
 
                 # Validate that the client type matches the endpoint's expected type
                 # Send user-friendly error messages for common mismatches
-                if message_request_type == "text" and intended_return_type == "html":
+                if message_request_type == ReturnTypes.TEXT and intended_return_type == ReturnTypes.HTML:
                     logger.info(f"Request mismatch from {from_id}: text client requesting HTML endpoint {path}")
                     self._throw_error_response(
                         from_id,
@@ -591,7 +592,7 @@ class MeshPagesServer:
                         StatusCodes.BAD_REQUEST,
                     )
                     return
-                elif message_request_type == "html" and intended_return_type == "text":
+                elif message_request_type == ReturnTypes.HTML and intended_return_type == ReturnTypes.TEXT:
                     logger.info(f"Request mismatch from {from_id}: HTML client requesting text endpoint {path}")
                     self._throw_error_response(
                         from_id,
@@ -600,7 +601,7 @@ class MeshPagesServer:
                     )
                     return
                 # Catch unexpected request types (edge case: malformed or hacked requests)
-                elif message_request_type != intended_return_type:
+                elif message_request_type != intended_return_type and intended_return_type != ReturnTypes.BOTH:
                     logger.warning(f"Unexpected request type mismatch from {from_id}: request_type={message_request_type}, expected={intended_return_type}")
                     self._throw_error_response(
                         from_id,
@@ -650,7 +651,7 @@ class MeshPagesServer:
                     User(
                         from_id=from_id,
                         result=result,
-                        intended_return_type=intended_return_type,
+                        intended_return_type=message_request_type,
                         status_code=status_code,
                         time_received=time.time(),
                     )
@@ -663,6 +664,7 @@ class MeshPagesServer:
                 logger.info(f"Route not found from {from_id}: requested {text}, available routes: {list(self.routes.keys())}")
                 text_routes = []
                 html_routes = []
+                both_routes = []
 
                 # Categorize routes by their intended return type with parameter type hints
                 # Loop through all registered routes to format them with type information
@@ -697,18 +699,30 @@ class MeshPagesServer:
                         route_with_params = route
 
                     # Categorize the formatted route by its intended return type
-                    if route_info["intended_return_type"] == "text":
+                    if route_info["intended_return_type"] == ReturnTypes.TEXT:
                         text_routes.append(route_with_params)
-                    elif route_info["intended_return_type"] == "html":
+                    elif route_info["intended_return_type"] == ReturnTypes.HTML:
                         html_routes.append(route_with_params)
+                    elif route_info["intended_return_type"] == ReturnTypes.BOTH:
+                        both_routes.append(route_with_params)
 
                 # Format routes as newline-separated lists for the error message
-                text_routes_str = "\n".join(text_routes)
-                html_routes_str = "\n".join(html_routes)
+                text_routes_str = "Meshtastic App:\n" + "\n".join(text_routes)
+                html_routes_str = "MeshPages Web Client:\n" + "\n".join(html_routes)
+                both_routes_str = "All Clients:\n" + "\n".join(both_routes)
 
                 # Return a 404 error with helpful suggestions about available routes (text routes for Meshtastic App, html routes for MeshPages Web Client)
-                route_error_message = f"Invalid. Choose from the following routes:\nMeshtastic App:\n{text_routes_str}\nMeshPages Web Client:\n{html_routes_str}"
-                route_error_message = f"<pre style='color: orange; white-space: pre-wrap; word-wrap: break-word; font-family: monospace;'>{route_error_message}</pre>" if message_request_type == "html" else route_error_message
+                # Build error message with available routes, organized by client type
+                route_error_message = "Invalid. Choose from the following routes:"
+                if text_routes:
+                    route_error_message += f"\n{text_routes_str}"
+                if html_routes:
+                    route_error_message += f"\n{html_routes_str}"
+                if both_routes:
+                    route_error_message += f"\n{both_routes_str}"
+                # Format as styled HTML for web clients, plain text for Meshtastic app
+                route_error_message = f"<pre style='color: orange; white-space: pre-wrap; word-wrap: break-word; font-family: monospace;'>{route_error_message}</pre>" if message_request_type == ReturnTypes.HTML else route_error_message
+
                 self._throw_error_response(
                     from_id,
                     route_error_message,
@@ -755,25 +769,25 @@ class MeshPagesServer:
     def page(
         self,
         path: str,
-        intended_return_type: str = "html",
+        intended_return_type: str = ReturnTypes.BOTH,
     ) -> Callable[[Callable], Callable]:
         """
         Decorator to register an endpoint handler for a GET-like request path.
 
         Usage:
-            @server.page("/index.html", intended_return_type="html")
+            @server.page("/index.html", intended_return_type=ReturnTypes.HTML)
             def handle_index():
                 return "<html>...</html>"
 
         Parameters:
             path (str): The request path to match (e.g., "/index.html" or "/status").
-            intended_return_type (str): Response format - "html" or "text". Defaults to "html".
+            intended_return_type (str): Response format - HTML, TEXT, or BOTH. Defaults to BOTH.
 
         Returns:
             Callable[[Callable], Callable]: Decorator function that registers the handler and returns it unchanged.
 
         Raises:
-            ValueError: If intended_return_type is not "html" or "text".
+            ValueError: If intended_return_type is not HTML, TEXT, or BOTH.
         """
 
         # Validate the response type before registering the handler
@@ -838,6 +852,10 @@ class MeshPagesServer:
             logger.info(f"Position: {self.node_info.get('position', {})}")
             logger.info(f"Device Metrics: {self.node_info.get('deviceMetrics', {})}")
             logger.info(f"Is Favorite: {self.node_info.get('isFavorite', False)}")
+
+            # Validate that at least one endpoint is registered before starting the server
+            if not self.routes:
+                raise ValueError("No routes registered. Please register at least one route using the @page decorator.")
 
             logger.info(f"Server started with {len(self.routes)} routes registered")
             logger.info("Server ready and listening for requests")

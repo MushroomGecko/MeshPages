@@ -43,4 +43,9 @@ Hang on a second.
 """
 
 
+@app.page("/git", intended_return_type="both")
+def git_page():
+    return "Shameless plug: https://github.com/MushroomGecko/MeshPages"
+
+
 app.run()
