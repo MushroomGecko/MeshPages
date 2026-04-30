@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from meshpages import MeshPagesClient
-from meshpages.utils import parse_file_path, parse_uri
+from meshpages.utils import parse_file_path, parse_uri, save_page
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
