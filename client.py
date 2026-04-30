@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from meshpages import MeshPagesClient
-from meshpages.utils import parse_file_path, parse_uri, save_page
+from meshpages.utils import parse_file_path, parse_uri
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -58,8 +58,6 @@ def save_page(
 
     # Resolve the path to a full filesystem path
     full_path = parse_file_path(node_id, path, base_path="saved_pages")
-
-    print(f"Saving page to {full_path}")
 
     # Create parent directories if they don't exist
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
@@ -167,8 +165,6 @@ def search(
     """
     # Parse the query string into node_id and path components
     node_id, path = parse_uri(query)
-
-    print(f"Action: {action}")
 
     # Attempt to retrieve the page from the mesh network
     if node_id and path:
