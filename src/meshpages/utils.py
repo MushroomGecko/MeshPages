@@ -1,6 +1,8 @@
-import brotli
+import os
+import re
 from urllib.parse import parse_qsl
 
+import brotli
 import meshtastic
 import meshtastic.ble_interface
 import meshtastic.stream_interface
@@ -254,3 +256,36 @@ def get_node_db_info(interface: meshtastic.stream_interface.StreamInterface) -> 
         }
 
     return node_db_info
+
+
+def parse_file_path(node_id: str, path: str, base_path: str) -> str:
+    """
+    Resolve a path to a full filesystem path.
+
+    Parameters:
+        node_id (str): The mesh node ID (! prefix is stripped if present).
+        path (str): The path on the remote node (may contain leading slashes, query strings, or fragments).
+        base_path (str): The base directory for resolving the path.
+
+    Returns:
+        str: The full filesystem path after normalization and security checks.
+    """
+    # Remove the "!" prefix from node_id if present (mesh protocol convention)
+    if node_id.startswith("!"):
+        node_id = node_id[1:]
+
+    # Remove query strings and fragments (everything after ? or #)
+    path = re.split(r"[?#]", path)[0]
+
+    # Strip leading and trailing slashes and whitespace
+    path = path.strip("/").strip()
+
+    # Collapse multiple consecutive slashes into single slashes
+    path = re.sub(r"/+", "/", path)
+
+    # Security: prevent directory traversal attacks
+    path = os.path.normpath(path)
+    if path.startswith(".."):
+        path = path.lstrip(".")
+
+    return os.path.join(base_path, node_id, path)

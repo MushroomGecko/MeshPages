@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from meshpages import MeshPagesClient
-from meshpages.utils import parse_uri
+from meshpages.utils import parse_file_path, parse_uri
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,8 +37,11 @@ templates = Jinja2Templates(directory="templates")
 meshpage = None
 
 
-# TODO: Fully implement this function
-def save_page(node_id: str, path: str, content: str) -> str:
+def save_page(
+    node_id: str,
+    path: str,
+    content: str,
+) -> str:
     """
     Save retrieved page content to the local filesystem.
 
@@ -52,12 +55,11 @@ def save_page(node_id: str, path: str, content: str) -> str:
     Returns:
         str: The full filesystem path where the page was saved.
     """
-    # Remove the "!" prefix from node_id if present (mesh protocol convention)
-    if node_id.startswith("!"):
-        node_id = node_id[1:]
 
-    # Construct the filesystem path: saved_pages/<node_id>/<path>.html
-    full_path = os.path.join("saved_pages", node_id, f"{path}.html")
+    # Resolve the path to a full filesystem path
+    full_path = parse_file_path(node_id, path, base_path="saved_pages")
+
+    print(f"Saving page to {full_path}")
 
     # Create parent directories if they don't exist
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
@@ -67,6 +69,39 @@ def save_page(node_id: str, path: str, content: str) -> str:
         file.write(content)
 
     return full_path
+
+
+def get_saved_page(
+    node_id: str,
+    path: str,
+) -> str:
+    """
+    Retrieve a previously saved page from the local filesystem.
+
+    Attempts to load a page that was previously fetched and stored locally.
+    Returns None if the file doesn't exist or if an error occurs during reading.
+
+    Parameters:
+        node_id (str): The mesh node ID (! prefix is stripped if present).
+        path (str): The page path on the remote node.
+
+    Returns:
+        str: The HTML content of the saved page, or None if not found or on error.
+    """
+    # Resolve the path to a full filesystem path using the saved_pages directory
+    full_path = parse_file_path(node_id, path, base_path="saved_pages")
+
+    # Attempt to read the file if it exists
+    if os.path.exists(full_path):
+        try:
+            with open(full_path, "r") as file:
+                return file.read()
+        except Exception as e:
+            # Log error and return None to indicate retrieval failed
+            logger.error(f"Error reading file {full_path}: {e}")
+            return None
+    # File doesn't exist in saved_pages
+    return None
 
 
 @asynccontextmanager
@@ -112,7 +147,11 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/search")
-def search(request: Request, query: str = Form(...)) -> dict:
+def search(
+    request: Request,
+    query: str = Form(...),
+    action: str = Form("search"),
+) -> dict:
     """
     Handle page search requests via mesh network.
 
@@ -129,16 +168,30 @@ def search(request: Request, query: str = Form(...)) -> dict:
     # Parse the query string into node_id and path components
     node_id, path = parse_uri(query)
 
+    print(f"Action: {action}")
+
     # Attempt to retrieve the page from the mesh network
     if node_id and path:
-        trace = meshpage.request_page(node_id, path)
-        if trace:
-            content = trace
-            # TODO: Fully implement this function
-            # Persist the retrieved content to local storage
-            # save_page(node_id, path, content)
+        # If user clicked "Quick Search", prioritize cached pages
+        if action == "quick-search":
+            content = get_saved_page(node_id, path)
+            if content:
+                logger.info(f"Using cached page for {query}")
+                # Return early with cached content, skip mesh request
+                return templates.TemplateResponse(
+                    request=request,
+                    name="results.html",
+                    context={"query": query, "content": content},
+                )
+        # Request fresh page from mesh network (or if quick-search had no cached result)
+        response = meshpage.request_page(node_id, path)
+        if response:
+            logger.info(f"Retrieved page from mesh for {query} and saved to cache")
+            content = response
+            # Persist the retrieved content to local storage for future quick-searches
+            save_page(node_id, path, content)
         else:
-            # Remote node did not return content
+            # Remote node did not return content or timed out
             content = "<p>Node not found</p>"
     else:
         # Query format was invalid or unparseable

@@ -11,8 +11,9 @@
         <div class="pt-3 px-3">
             <form method="post" action="/search" class="w-100">
                 <div class="input-group">
-                    <input type="text" name="query" class="form-control" placeholder="Enter path or search..." required>
-                    <button class="btn btn-primary" type="submit">Search</button>
+                    <input type="text" name="query" class="form-control" placeholder="mesh://!7d9e2c51/home" title="An endpoint to a node's web page." required>
+                    <button class="btn btn-primary" id="search-button" name="action" value="search" type="submit" title="Get the latest version of the page">Search</button>
+                    <button class="btn btn-primary" id="quick-search-button" name="action" value="quick-search" type="submit" title="Use a saved copy of the page if available">Quick Search</button>
                 </div>
             </form>
         </div>
