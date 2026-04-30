@@ -4,16 +4,20 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Mesh Search</title>
-        <link rel="stylesheet" href="/static/css/style.css">
+        <link rel="stylesheet" href="/static/css/bootstrap.min.css">
     </head>
     <body>
-
-        <div class="search-container">
-            <form method="post" action="/search" style="display: contents;">
-                <input type="text" name="query" placeholder="Enter path or search..." required>
-                <button type="submit">Search</button>
+        
+        <div class="pt-3 px-3">
+            <form method="post" action="/search" class="w-100">
+                <div class="input-group">
+                    <input type="text" name="query" class="form-control" placeholder="Enter path or search..." required>
+                    <button class="btn btn-primary" type="submit">Search</button>
+                </div>
             </form>
         </div>
+
+        <script src="/static/js/bootstrap.bundle.min.js"></script>
 
     </body>
 </html>
