@@ -215,6 +215,28 @@ Once running, open your browser and navigate to `http://127.0.0.1:8000` to:
 - Request pages from remote mesh nodes
 - View responses and saved pages
 
+### Search vs. Quick Search
+
+The MeshPages web client offers two search modes for retrieving pages:
+
+#### Search (Get the Latest Version)
+The **Search** button always fetches a fresh copy of the requested page directly from the remote mesh node over the Meshtastic network. This ensures you get the most current version of the page, but requires a live connection to the target node and may take longer depending on network conditions and page size.
+
+Use Search when:
+- You need the latest, real-time data
+- You're connected to the mesh network and the target node is reachable
+- You want to bypass any cached/stale versions
+
+#### Quick Search (Use Saved Copy if Available)
+The **Quick Search** button prioritizes efficiency by first checking if a cached copy of the page exists locally on your device. If a previous request successfully retrieved the page, Quick Search loads that saved copy instantly without any mesh network activity. Only if no cached copy is found will it fetch a fresh version from the network and save it for future Quick Searches.
+
+Use Quick Search when:
+- You want the fastest possible response
+- You're offline or the target node is temporarily unreachable
+- You're okay with slightly stale data (cached from a previous request)
+
+The caching system helps reduce mesh network traffic and provides instant access to frequently visited pages while still allowing fresh retrieval when needed.
+
 ## Creating Your Own MeshPages Server
 
 MeshPages uses a FastAPI-inspired decorator pattern for defining routes. Creating a new server is simple:
