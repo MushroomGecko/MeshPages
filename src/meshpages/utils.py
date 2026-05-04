@@ -280,12 +280,16 @@ def parse_file_path(node_id: str, path: str, base_path: str) -> str:
     # Strip leading and trailing slashes and whitespace
     path = path.strip("/").strip()
 
-    # Collapse multiple consecutive slashes into single slashes
-    path = re.sub(r"/+", "/", path)
+    # If path is empty (original path was just "/"), use node_id as filename
+    if not path:
+        path = node_id
+    else:
+        # Collapse multiple consecutive slashes into single slashes
+        path = re.sub(r"/+", "/", path)
 
-    # Security: prevent directory traversal attacks
-    path = os.path.normpath(path)
-    if path.startswith(".."):
-        path = path.lstrip(".")
+        # Security: prevent directory traversal attacks
+        path = os.path.normpath(path)
+        if path.startswith(".."):
+            path = path.lstrip(".")
 
     return os.path.join(base_path, node_id, path)

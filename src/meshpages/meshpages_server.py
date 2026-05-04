@@ -39,6 +39,8 @@ if not logger.handlers:
     # Allow environment variable to override log level (default: INFO)
     log_level = os.environ.get("PYTHONLOGLEVEL", "INFO").upper()
     logger.setLevel(getattr(logging, log_level))
+    # Prevent duplicate logs by not propagating to parent loggers
+    logger.propagate = False
 
 # Buffer offset for the packet header
 BUFFER_OFFSET = 7
