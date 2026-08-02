@@ -7,6 +7,7 @@ via USB, Bluetooth, or other connection types available on the system.
 
 import logging
 
+import meshpages.termux
 import meshtastic.util
 import meshtastic.ble_interface
 
