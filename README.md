@@ -92,7 +92,7 @@ All other dependencies use the default PyPI index.
 Verify the installation:
 
 ```bash
-uv run python -c "import meshtastic, pydantic, pydantic_core; print('MeshPages dependencies ready:', pydantic.__version__, pydantic_core.__version__)"
+uv run python helper_utilities/verify.py
 ```
 
 For MeshPages, use the host interface:
