@@ -33,7 +33,7 @@ The Meshtastic Android App experiencing a non-existent endpoint, trying to get t
 
 ### Installation
 
-#### Option 1: Development Installation (Recommended for Development)
+#### Common Setup
 
 1. Clone this repository:
 
@@ -54,40 +54,28 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-4. Install dependencies and MeshPages in editable mode:
+#### Option 1: Development Installation (Recommended for Development)
+
+Install MeshPages in editable mode:
 
 ```bash
 pip install -e .
-pip install -r requirements.txt
 ```
 
 This allows you to import `meshpages` directly while developing and see changes immediately.
 
 #### Option 2: Production Installation (Standard Package Install)
 
-1. Clone this repository:
-
-```bash
-git clone https://github.com/MushroomGecko/MeshPages.git
-cd MeshPages
-```
-
-2. Create a virtual environment:
-
-```bash
-python3 -m venv .venv
-```
-
-3. Activate the virtual environment:
-
-```bash
-source .venv/bin/activate
-```
-
-4. Install the package:
+Install the package:
 
 ```bash
 pip install .
+```
+
+For either installation option, install the Python dependencies:
+
+```bash
+pip install -r requirements.txt
 ```
 
 ### Termux (Android)
@@ -96,23 +84,8 @@ USB support for MeshPages on Termux is currently unavailable. If you want to
 use MeshPages from Termux, connect to a Meshtastic device over Wi-Fi using its
 IP address instead of using a USB interface.
 
-For MeshPages, use the host interface:
-
-```bash
-python client.py \
-  --interface-type host \
-  --interface-path 192.168.1.100:4403
-```
-
-The official [Meshtastic Python CLI installation
-documentation](https://meshtastic.org/docs/software/python/cli/installation/)
-also states:
-
-> Be aware that the Meshtastic CLI is not able to control the nodes over USB through termux, but you can control devices over Wifi using the --host x.x.x.x option with the device IP address (ESP32 or Pico W only).
-
-#### Termux Dependencies
-
-Install the Termux packages needed to run MeshPages over a network connection:
+Start by installing the Termux packages needed to run MeshPages over a network
+connection:
 
 ```bash
 pkg update
@@ -120,15 +93,19 @@ pkg upgrade
 pkg install git python
 ```
 
-Create and activate the virtual environment as shown above, then install the
-Python dependencies listed in `requirements.txt`:
+Then follow the [common setup](#common-setup) and choose either the
+[development](#option-1-development-installation-recommended-for-development)
+or [production](#option-2-production-installation-standard-package-install)
+installation option above. Before running the shared `requirements.txt`
+command, make the Termux-specific dependency change:
 
-```bash
-pip install -r requirements.txt
-```
+1. Uncomment the `htmlmin4` line in `requirements.txt`.
+2. Comment out `minify-html-onepass`.
+3. Run the shared dependency command:
 
-When using Termux, uncomment the `htmlmin4` line in `requirements.txt` and
-comment out `minify-html-onepass` instead.
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 Termux may need Android-compatible Pydantic packages. Install the matching
 versions from the Termux User Repository:
@@ -147,6 +124,20 @@ Verify the installation:
 ```bash
 python -c "import meshtastic, pydantic, pydantic_core; print('MeshPages dependencies ready:', pydantic.__version__, pydantic_core.__version__)"
 ```
+
+For MeshPages, use the host interface:
+
+```bash
+python client.py \
+  --interface-type host \
+  --interface-path 192.168.1.100:4403 # Replace with your node's IP
+```
+
+The official [Meshtastic Python CLI installation
+documentation](https://meshtastic.org/docs/software/python/cli/installation/)
+also states:
+
+> Be aware that the Meshtastic CLI is not able to control the nodes over USB through termux, but you can control devices over Wifi using the --host x.x.x.x option with the device IP address (ESP32 or Pico W only).
 
 ### Finding Your Radios
 
