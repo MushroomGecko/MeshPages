@@ -90,6 +90,64 @@ source .venv/bin/activate
 pip install .
 ```
 
+### Termux (Android)
+
+USB support for MeshPages on Termux is currently unavailable. If you want to
+use MeshPages from Termux, connect to a Meshtastic device over Wi-Fi using its
+IP address instead of using a USB interface.
+
+For MeshPages, use the host interface:
+
+```bash
+python client.py \
+  --interface-type host \
+  --interface-path 192.168.1.100:4403
+```
+
+The official [Meshtastic Python CLI installation
+documentation](https://meshtastic.org/docs/software/python/cli/installation/)
+also states:
+
+> Be aware that the Meshtastic CLI is not able to control the nodes over USB through termux, but you can control devices over Wifi using the --host x.x.x.x option with the device IP address (ESP32 or Pico W only).
+
+#### Termux Dependencies
+
+Install the Termux packages needed to run MeshPages over a network connection:
+
+```bash
+pkg update
+pkg upgrade
+pkg install git python
+```
+
+Create and activate the virtual environment as shown above, then install the
+Python dependencies listed in `requirements.txt`:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+When using Termux, uncomment the `htmlmin4` line in `requirements.txt` and
+comment out `minify-html-onepass` instead.
+
+Termux may need Android-compatible Pydantic packages. Install the matching
+versions from the Termux User Repository:
+
+```bash
+python -m pip install \
+  --force-reinstall \
+  --only-binary=:all: \
+  --extra-index-url https://termux-user-repository.github.io/pypi/ \
+  "pydantic==2.12.5" \
+  "pydantic-core==2.41.5"
+```
+
+Verify the installation:
+
+```bash
+python -c "import meshtastic, pydantic, pydantic_core; print('MeshPages dependencies ready:', pydantic.__version__, pydantic_core.__version__)"
+```
+
 ### Finding Your Radios
 
 Before connecting to your Meshtastic radio, you can discover available devices:
