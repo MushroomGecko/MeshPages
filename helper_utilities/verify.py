@@ -1,5 +1,6 @@
 """Verify that the active MeshPages uv profile is installed correctly."""
 
+from meshpages import termux
 from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version
 
