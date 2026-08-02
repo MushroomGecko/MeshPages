@@ -1,7 +1,7 @@
 import os
 import re
 from urllib.parse import parse_qsl
-
+import sys
 import brotli
 import meshtastic
 import meshtastic.ble_interface
@@ -97,6 +97,16 @@ def parse_hostname(hostname: str) -> tuple[str, int]:
         # Default to Meshtastic TCP default port if not specified
         return (hostname.strip(), 4403)
 
+def minify_html(html: str) -> str:
+    """
+    Minify an HTML string using the platform-appropriate implementation.
+    """
+    if sys.platform == "android":
+        import htmlmin
+        return htmlmin.minify(html)
+    else:
+        import minify_html_onepass
+        return minify_html_onepass.minify(html)
 
 def compress_payload(payload: str) -> bytes:
     """

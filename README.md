@@ -124,7 +124,7 @@ Create and activate the virtual environment as shown above, then install the
 Python dependencies listed in `requirements.txt`:
 
 ```bash
-python -m pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 When using Termux, uncomment the `htmlmin4` line in `requirements.txt` and
@@ -134,7 +134,7 @@ Termux may need Android-compatible Pydantic packages. Install the matching
 versions from the Termux User Repository:
 
 ```bash
-python -m pip install \
+pip install \
   --force-reinstall \
   --only-binary=:all: \
   --extra-index-url https://termux-user-repository.github.io/pypi/ \

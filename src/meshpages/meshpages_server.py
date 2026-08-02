@@ -13,7 +13,6 @@ import meshtastic.serial_interface
 import meshtastic.stream_interface
 import meshtastic.tcp_interface
 import meshtastic.version
-import minify_html_onepass
 from pubsub import pub
 
 from meshpages.air_traffic_control import AirTrafficControl
@@ -28,6 +27,7 @@ from meshpages.utils import (
     encode_packet,
     parse_hostname,
     parse_parameters,
+    minify_html,
 )
 
 logger = logging.getLogger(__name__)
@@ -306,7 +306,7 @@ class MeshPagesServer:
         logger.info(f"Sending response to {destination_id}: status={status_code}, type={response_type}")
         if response_type == ReturnTypes.HTML:
             # Remove unnecessary whitespace and HTML comments from the response to reduce size
-            response_string = minify_html_onepass.minify(response_string)
+            response_string = minify_html(response_string)
             logger.debug(f"Minified response size: {len(response_string)} characters")
 
             # Apply Brotli compression with quality 11 (maximum compression) for further size reduction
