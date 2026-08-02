@@ -17,10 +17,44 @@ classifiers = [
 ]
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
+dependencies = [
+    "meshtastic>=2.7.8",
+    "fastapi>=0.136.1",
+    "uvicorn",
+    "jinja2",
+    "python-multipart",
+    "brotli>=1.2.0",
+]
+
+[project.optional-dependencies]
+default = [
+    "minify-html-onepass>=0.18.1",
+]
+termux = [
+    "htmlmin4>=0.2.15",
+    "pydantic==2.12.5",
+    "pydantic-core==2.41.5",
+]
 
 [project.urls]
 Homepage = "https://github.com/pypa/sampleproject"
 Issues = "https://github.com/pypa/sampleproject/issues"
+
+[tool.uv]
+conflicts = [
+    [
+        { extra = "default" },
+        { extra = "termux" },
+    ],
+]
+
+[[tool.uv.index]]
+name = "termux"
+url = "https://termux-user-repository.github.io/pypi/"
+explicit = true
+
+[tool.uv.sources]
+pydantic-core = [{ index = "termux", extra = "termux" }]
 
 [tool.black]
 line-length = 9999

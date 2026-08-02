@@ -33,96 +33,66 @@ The Meshtastic Android App experiencing a non-existent endpoint, trying to get t
 
 ### Installation
 
-#### Common Setup
+MeshPages uses [uv](https://docs.astral.sh/uv/) to manage its Python
+environment and dependencies.
 
-1. Clone this repository:
+#### Default Profile
+
+Install uv using the
+[official installation instructions](https://docs.astral.sh/uv/getting-started/installation/),
+then clone the repository:
 
 ```bash
 git clone https://github.com/MushroomGecko/MeshPages.git
 cd MeshPages
 ```
 
-2. Create a virtual environment:
+Create the environment and install the default profile:
 
 ```bash
-python3 -m venv .venv
+uv sync --extra default
 ```
 
-3. Activate the virtual environment:
+This profile uses the standard PyPI Pydantic packages and
+`minify-html-onepass`. To work on MeshPages in editable mode, use:
 
 ```bash
-source .venv/bin/activate
+uv run client.py
 ```
 
-#### Option 1: Development Installation (Recommended for Development)
-
-Install MeshPages in editable mode:
-
-```bash
-pip install -e .
-```
-
-This allows you to import `meshpages` directly while developing and see changes immediately.
-
-#### Option 2: Production Installation (Standard Package Install)
-
-Install the package:
-
-```bash
-pip install .
-```
-
-For either installation option, install the Python dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-### Termux (Android)
+#### Termux Profile (Android)
 
 USB support for MeshPages on Termux is currently unavailable. If you want to
 use MeshPages from Termux, connect to a Meshtastic device over Wi-Fi using its
 IP address instead of using a USB interface.
 
-Start by installing the Termux packages needed to run MeshPages over a network
-connection:
+Install the Termux packages needed to run MeshPages over a network connection,
+including uv:
 
 ```bash
 pkg update
 pkg upgrade
-pkg install git python
+pkg install git python uv
 ```
 
-Then follow the [common setup](#common-setup) and choose either the
-[development](#option-1-development-installation-recommended-for-development)
-or [production](#option-2-production-installation-standard-package-install)
-installation option above. Before running the shared `requirements.txt`
-command, make the Termux-specific dependency change:
-
-1. Uncomment the `htmlmin4` line in `requirements.txt`.
-2. Comment out `minify-html-onepass`.
-3. Run the shared dependency command:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-Termux may need Android-compatible Pydantic packages. Install the matching
-versions from the Termux User Repository:
+Clone the repository and install the Termux profile:
 
 ```bash
-pip install \
-  --force-reinstall \
-  --only-binary=:all: \
-  --extra-index-url https://termux-user-repository.github.io/pypi/ \
-  "pydantic==2.12.5" \
-  "pydantic-core==2.41.5"
+git clone https://github.com/MushroomGecko/MeshPages.git
+cd MeshPages
+uv sync --extra termux
 ```
+
+This profile uses `htmlmin4` instead of `minify-html-onepass`. It also pins
+`pydantic` and `pydantic-core` to Android-compatible versions and downloads
+them from the
+[Termux User Repository PyPI index](https://termux-user-repository.github.io/pypi/).
+All other dependencies use the default PyPI index.
 
 Verify the installation:
 
 ```bash
-python -c "import meshtastic, pydantic, pydantic_core; print('MeshPages dependencies ready:', pydantic.__version__, pydantic_core.__version__)"
+uv run python -c "import meshtastic, pydantic, pydantic_core; print('MeshPages dependencies ready:', pydantic.__version__, pydantic_core.__version__)"
 ```
 
 For MeshPages, use the host interface:
