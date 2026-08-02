@@ -1,5 +1,8 @@
 meshtastic>=2.7.8
-fastapi[standard]>=0.136.1
+fastapi>=0.136.1
+uvicorn
+jinja2
+python-multipart
 brotli>=1.2.0
 minify-html-onepass>=0.18.1
 # htmlmin4>=0.2.15 # Uncomment this line when using Termux and comment out minify-html-onepass instead
