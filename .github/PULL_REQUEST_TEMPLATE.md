@@ -8,6 +8,7 @@ Brief description of what this PR does.
 - [ ] New feature (non-breaking change that adds functionality)
 - [ ] Breaking change (fix or feature that would cause existing functionality to change)
 - [ ] Documentation update
+- [ ] FCC compliance update
 
 ## Motivation & Context
 

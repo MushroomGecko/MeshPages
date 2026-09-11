@@ -577,7 +577,7 @@ This ensures mesh health even during heavy traffic periods.
 
 #### Air Traffic Control Options
 
-##### `air_traffic_control_config` (Config or ChannelPresets, default: ChannelPresets.LONG_FAST)
+##### `air_traffic_control_config` (Config or ChannelPresets, default: ChannelPresets.LONG_TURBO)
 
 Meshtastic LoRa radio configuration for data rate calculations. Pre-configured presets available:
 

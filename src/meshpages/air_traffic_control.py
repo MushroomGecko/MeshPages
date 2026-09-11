@@ -18,7 +18,7 @@ class AirTrafficControl:
 
     def __init__(
         self,
-        config: Union[Config, ChannelPresets] = ChannelPresets.LONG_FAST,
+        config: Union[Config, ChannelPresets] = ChannelPresets.LONG_TURBO,
         target_utilization_percent: float = 50.0,  # in percent
         window_seconds: float = 15.0,  # in seconds
         meshtastic_overhead_bytes: int = 20,  # in bytes
@@ -27,7 +27,7 @@ class AirTrafficControl:
         Initialize the air traffic control manager.
 
         Parameters:
-            config (Union[Config, ChannelPresets]): LoRa radio configuration. Defaults to LONG_FAST preset.
+            config (Union[Config, ChannelPresets]): LoRa radio configuration. Defaults to LONG_TURBO preset.
             target_utilization_percent (float): Target channel utilization as percentage (0-100). Defaults to 50%.
             window_seconds (float): Time window for calculating utilization (seconds). Defaults to 15 seconds.
             meshtastic_overhead_bytes (int): Protocol overhead bytes per packet. Defaults to 20.
