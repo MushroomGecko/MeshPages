@@ -77,7 +77,7 @@ class MeshPagesServer:
         timeout: int = 300,  # in seconds
         courtousy_interval: float = 3.0,  # in seconds
         message_ack: str = True,  # True for TCP style, False for UDP style of message sending
-        air_traffic_control_config: Union[Config, ChannelPresets] = ChannelPresets.LONG_FAST,  # in Config or ChannelPresets
+        air_traffic_control_config: Union[Config, ChannelPresets] = ChannelPresets.LONG_TURBO,  # in Config or ChannelPresets
         air_traffic_control_target_utilization_percent: float = 50.0,  # in percent
         air_traffic_control_window_seconds: float = 10.0,  # in seconds
         air_traffic_control_meshtastic_overhead_bytes: int = 20,  # in bytes
@@ -94,7 +94,7 @@ class MeshPagesServer:
             loop_interval (float): How often to process the user queue (seconds). Defaults to 1.0.
             timeout (int): Maximum time to wait before dropping a client request (seconds). Defaults to 300.
             courtousy_interval (float): Delay between sending consecutive chunks (seconds). Defaults to 3.0.
-            air_traffic_control_config (Union[Config, ChannelPresets]): LoRa radio configuration. Defaults to LONG_FAST preset.
+            air_traffic_control_config (Union[Config, ChannelPresets]): LoRa radio configuration. Defaults to LONG_TURBO preset.
             air_traffic_control_target_utilization_percent (float): Target channel utilization (0-100). Defaults to 50%.
             air_traffic_control_window_seconds (float): Time window for utilization calculation (seconds). Defaults to 10.0.
             air_traffic_control_meshtastic_overhead_bytes (int): Protocol overhead per packet (bytes). Defaults to 20.

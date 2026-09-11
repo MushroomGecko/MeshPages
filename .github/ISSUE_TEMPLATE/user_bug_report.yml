@@ -68,7 +68,7 @@ body:
         Radio 1: Heltec V3 (node !9e9d7a6c)
         Radio 2: RAK Wireless (node !5f2e1a3b)
         Firmware version: 2.7.15
-        LoRa settings: LONG_FAST preset
+        LoRa settings: LONG_TURBO preset
 
   - type: textarea
     id: error_messages
